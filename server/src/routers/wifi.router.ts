@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { logger } from "../logger";
-import { deleteWifiCredential, getWifiCredentials, saveWifiCredential } from "../utils/wifi.helper";
+import { deleteWifiCredential, getAvailableSsids, getWifiCredentials, saveWifiCredential } from "../utils/wifi.helper";
 
 export const wifiRouter = Router();
 
@@ -11,6 +11,16 @@ wifiRouter.get("/", async (_req: Request, res: Response) => {
     } catch (error) {
         logger.error(`[wifi]: Failed to fetch credentials: ${error}`);
         res.status(500).json({ error: "Failed to fetch WiFi credentials" });
+    }
+});
+
+wifiRouter.get("/available", async (_req: Request, res: Response) => {
+    try {
+        const ssids = await getAvailableSsids();
+        res.json(ssids);
+    } catch (error) {
+        logger.error(`[wifi]: Failed to fetch available SSIDs: ${error}`);
+        res.status(500).json({ error: "Failed to fetch available SSIDs" });
     }
 });
 

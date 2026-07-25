@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTrash, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faTrash, faEye, faEyeSlash, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import style from "./wifi-credentials.module.css";
 import { BACKEND_URL } from "../../constants/env";
 
@@ -18,6 +18,9 @@ const WifiCredentials = () => {
     const [revealed, setRevealed] = useState<Record<number, boolean>>({});
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
+    const [availableSsids, setAvailableSsids] = useState<string[]>([]);
+    const [showPicker, setShowPicker] = useState(false);
+    const [scanning, setScanning] = useState(false);
 
     const fetchCredentials = async () => {
         try {
@@ -38,6 +41,35 @@ const WifiCredentials = () => {
     useEffect(() => {
         fetchCredentials();
     }, []);
+
+    const handleSearchSsids = async () => {
+        if (showPicker) {
+            setShowPicker(false);
+            return;
+        }
+        setScanning(true);
+        setError("");
+        try {
+            const response = await fetch(`${BACKEND_URL}/wifi/available`);
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}`);
+            }
+            const data: string[] = await response.json();
+            setAvailableSsids(data);
+            setShowPicker(true);
+        } catch (err) {
+            console.error("Failed to fetch available SSIDs", err);
+            setError("Could not load available networks.");
+        } finally {
+            setScanning(false);
+        }
+    };
+
+    const handleSelectSsid = (selected: string) => {
+        setSsid(selected);
+        setShowPicker(false);
+        if (error) setError("");
+    };
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -96,15 +128,44 @@ const WifiCredentials = () => {
                 <p>Saved network names and passwords used to provision devices.</p>
 
                 <form className={style["add-form"]} onSubmit={handleAdd}>
-                    <input
-                        type="text"
-                        placeholder="Network name (SSID)"
-                        value={ssid}
-                        onChange={(e) => {
-                            setSsid(e.target.value);
-                            if (error) setError("");
-                        }}
-                    />
+                    <div className={style["ssid-field"]}>
+                        <button
+                            type="button"
+                            className={style["search-ssid"]}
+                            onClick={handleSearchSsids}
+                            disabled={scanning}
+                            aria-label="Search available networks"
+                            title="Search available networks"
+                        >
+                            <FontAwesomeIcon icon={faMagnifyingGlass} />
+                        </button>
+                        <input
+                            type="text"
+                            placeholder="Network name (SSID)"
+                            value={ssid}
+                            onChange={(e) => {
+                                setSsid(e.target.value);
+                                if (error) setError("");
+                            }}
+                        />
+                        {showPicker && (
+                            <ul className={style["ssid-picker"]}>
+                                {availableSsids.length === 0 ? (
+                                    <li className={style["ssid-picker-empty"]}>
+                                        No networks found from discovered devices.
+                                    </li>
+                                ) : (
+                                    availableSsids.map((name) => (
+                                        <li key={name}>
+                                            <button type="button" onClick={() => handleSelectSsid(name)}>
+                                                {name}
+                                            </button>
+                                        </li>
+                                    ))
+                                )}
+                            </ul>
+                        )}
+                    </div>
                     <div className={style["password-field"]}>
                         <input
                             type={showPassword ? "text" : "password"}

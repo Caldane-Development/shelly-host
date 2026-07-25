@@ -1,9 +1,18 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { wifiCredentials } from "../db/schema";
+import { wifiCredentials, devices } from "../db/schema";
 
 export const getWifiCredentials = async () => {
     return db.select().from(wifiCredentials).orderBy(wifiCredentials.ssid);
+};
+
+export const getAvailableSsids = async (): Promise<string[]> => {
+    const rows = await db
+        .selectDistinct({ ssid: devices.ssid })
+        .from(devices)
+        .where(sql`${devices.ssid} <> ''`)
+        .orderBy(devices.ssid);
+    return rows.map((row) => row.ssid);
 };
 
 export const saveWifiCredential = async (ssid: string, password: string) => {
