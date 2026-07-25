@@ -21,7 +21,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.158",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe21008": {
                 "id": "80646fe21008",
@@ -42,7 +42,7 @@
                 "modified": 1737671094,
                 "cloud_online": true,
                 "ip": "192.168.1.153",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "34b7dac96440": {
                 "id": "34b7dac96440",
@@ -63,7 +63,7 @@
                 "ip": "192.168.1.135",
                 "cloud_online": true,
                 "modified": 1742083123,
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "34b7dac9a048": {
                 "id": "34b7dac9a048",
@@ -84,7 +84,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.112",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20828_3": {
                 "id": "80646fe20828_3",
@@ -104,7 +104,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.144",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da243aff0": {
                 "id": "cc8da243aff0",
@@ -125,7 +125,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.154",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20b10_2": {
                 "id": "80646fe20b10_2",
@@ -145,7 +145,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.108",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "34b7dac965d8": {
                 "id": "34b7dac965d8",
@@ -166,7 +166,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.161",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320464fc4c": {
                 "id": "54320464fc4c",
@@ -187,7 +187,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.146",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20828_1": {
                 "id": "80646fe20828_1",
@@ -207,7 +207,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.144",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20978_1": {
                 "id": "80646fe20978_1",
@@ -227,7 +227,7 @@
                 "jti": "",
                 "modified": 1741485562,
                 "ip": "192.168.1.141",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "b8d61a8aaff4": {
                 "id": "b8d61a8aaff4",
@@ -248,7 +248,7 @@
                 "modified": 1741485567,
                 "cloud_online": true,
                 "ip": "192.168.1.40",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe21008_1": {
                 "id": "80646fe21008_1",
@@ -268,7 +268,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.153",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe208c0_2": {
                 "id": "80646fe208c0_2",
@@ -288,7 +288,7 @@
                 "jti": "",
                 "modified": 1741485565,
                 "ip": "192.168.1.143",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe21008_2": {
                 "id": "80646fe21008_2",
@@ -308,7 +308,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.153",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320464f030": {
                 "id": "54320464f030",
@@ -329,7 +329,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.124",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da245b2f4": {
                 "id": "cc8da245b2f4",
@@ -350,7 +350,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.101",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da24537c0": {
                 "id": "cc8da24537c0",
@@ -371,7 +371,7 @@
                 "cloud_online": true,
                 "modified": 1741485567,
                 "ip": "192.168.1.137",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204690b8c": {
                 "id": "543204690b8c",
@@ -392,7 +392,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.106",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204656ddc": {
                 "id": "543204656ddc",
@@ -413,7 +413,7 @@
                 "cloud_online": true,
                 "modified": 1742082535,
                 "ip": "192.168.1.163",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe21008_3": {
                 "id": "80646fe21008_3",
@@ -433,7 +433,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.153",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da244a084": {
                 "id": "cc8da244a084",
@@ -454,7 +454,7 @@
                 "modified": 1742082827,
                 "cloud_online": true,
                 "ip": "192.168.1.118",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "b8d61a8a70fc": {
                 "id": "b8d61a8a70fc",
@@ -470,7 +470,7 @@
                 "image": "assets/user_images/543d2ef676401b0bd5cb94beb0d0f6bf/device/thumb_1704671764659b3a143ddfd.jpeg",
                 "modified": 1730698566,
                 "ip": "192.168.86.53",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true,
                 "cloud_options": {
                     "exclude_event_log": false
@@ -496,7 +496,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.144",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204654360": {
                 "id": 543204654360,
@@ -517,7 +517,7 @@
                 "cloud_online": true,
                 "modified": 1741485564,
                 "ip": "192.168.1.149",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da246458c": {
                 "id": "cc8da246458c",
@@ -538,7 +538,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.172",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da244ac20": {
                 "id": "cc8da244ac20",
@@ -559,7 +559,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.164",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204652fa0": {
                 "id": "543204652fa0",
@@ -580,7 +580,7 @@
                 "modified": 1741485567,
                 "cloud_online": true,
                 "ip": "192.168.1.127",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204651480": {
                 "id": 543204651480,
@@ -601,7 +601,7 @@
                 "cloud_online": true,
                 "modified": 1741485563,
                 "ip": "192.168.1.150",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "5432045ff028": {
                 "id": "5432045ff028",
@@ -622,7 +622,7 @@
                 "cloud_online": true,
                 "modified": 1742958635,
                 "ip": "192.168.1.178",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20828_2": {
                 "id": "80646fe20828_2",
@@ -642,7 +642,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.144",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20f94": {
                 "id": "80646fe20f94",
@@ -663,7 +663,7 @@
                 "modified": 1737671094,
                 "cloud_online": true,
                 "ip": "192.168.1.176",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204653cac": {
                 "id": "543204653cac",
@@ -684,7 +684,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.182",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20f94_1": {
                 "id": "80646fe20f94_1",
@@ -704,7 +704,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.176",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20f40": {
                 "id": "80646fe20f40",
@@ -724,7 +724,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.119",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "5432045c8e7c": {
@@ -746,7 +746,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.142",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe208c0": {
                 "id": "80646fe208c0",
@@ -767,7 +767,7 @@
                 "modified": 1741485565,
                 "cloud_online": true,
                 "ip": "192.168.1.143",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320462321c": {
                 "id": "54320462321c",
@@ -788,7 +788,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.120",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20bb4_1": {
                 "id": "80646fe20bb4_1",
@@ -808,7 +808,7 @@
                 "bundle": false,
                 "ip": "192.168.1.110",
                 "modified": 1727312814,
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da2454e6c": {
                 "id": "cc8da2454e6c",
@@ -829,7 +829,7 @@
                 "ip": "192.168.1.107",
                 "cloud_online": true,
                 "modified": 1742083133,
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20bb4_2": {
                 "id": "80646fe20bb4_2",
@@ -849,7 +849,7 @@
                 "bundle": false,
                 "ip": "192.168.1.110",
                 "modified": 1727312814,
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "5432046908d4": {
                 "id": "5432046908d4",
@@ -870,7 +870,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.188",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da245348c": {
                 "id": "cc8da245348c",
@@ -891,7 +891,7 @@
                 "cloud_online": true,
                 "modified": 1741786608,
                 "ip": "192.168.1.198",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "34b7dac9ab60": {
                 "id": "34b7dac9ab60",
@@ -911,7 +911,7 @@
                 "jti": "",
                 "modified": 1741485567,
                 "ip": "192.168.1.192",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "34b7da8e6650": {
@@ -933,7 +933,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.152",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20b10": {
                 "id": "80646fe20b10",
@@ -954,7 +954,7 @@
                 "modified": 1737671094,
                 "cloud_online": true,
                 "ip": "192.168.1.108",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320465d490": {
                 "id": "54320465d490",
@@ -975,7 +975,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.183",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da2450750": {
                 "id": "cc8da2450750",
@@ -995,7 +995,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.147",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "80646fe20bb4": {
@@ -1017,7 +1017,7 @@
                 "ip": "192.168.1.110",
                 "modified": 1727312815,
                 "cloud_online": true,
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe208c0_1": {
                 "id": "80646fe208c0_1",
@@ -1037,7 +1037,7 @@
                 "jti": "",
                 "modified": 1741485567,
                 "ip": "192.168.1.143",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204623f84": {
                 "id": "543204623f84",
@@ -1057,7 +1057,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.110",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "80646fe208c0_3": {
@@ -1078,7 +1078,7 @@
                 "jti": "",
                 "modified": 1741485566,
                 "ip": "192.168.1.143",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204624efc": {
                 "id": "543204624efc",
@@ -1099,7 +1099,7 @@
                 "cloud_online": true,
                 "modified": 1741485567,
                 "ip": "192.168.1.103",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204689c44": {
                 "id": "543204689c44",
@@ -1120,7 +1120,7 @@
                 "cloud_online": true,
                 "modified": 1742958263,
                 "ip": "192.168.1.151",
-                "ssid": "Gondor",
+                "ssid": "",
                 "name_sync": false
             },
             "80646fe20f40_2": {
@@ -1141,7 +1141,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.119",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da245791c": {
                 "id": "cc8da245791c",
@@ -1162,7 +1162,7 @@
                 "ip": "192.168.1.177",
                 "cloud_online": true,
                 "modified": 1742082823,
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20978": {
                 "id": "80646fe20978",
@@ -1182,7 +1182,7 @@
                 "jti": "",
                 "modified": 1741485566,
                 "ip": "192.168.1.141",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "5432046402f0": {
@@ -1204,7 +1204,7 @@
                 "cloud_online": true,
                 "modified": 1741485567,
                 "ip": "192.168.1.157",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320468f890": {
                 "id": "54320468f890",
@@ -1225,7 +1225,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.162",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20f40_1": {
                 "id": "80646fe20f40_1",
@@ -1245,7 +1245,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.119",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20f94_3": {
                 "id": "80646fe20f94_3",
@@ -1265,7 +1265,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.176",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20b10_3": {
                 "id": "80646fe20b10_3",
@@ -1285,7 +1285,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.108",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20f40_3": {
                 "id": "80646fe20f40_3",
@@ -1305,7 +1305,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.119",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204660bc0": {
                 "id": "543204660bc0",
@@ -1326,7 +1326,7 @@
                 "cloud_online": true,
                 "modified": 1741485564,
                 "ip": "192.168.1.170",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204654400": {
                 "id": 543204654400,
@@ -1347,7 +1347,7 @@
                 "modified": 1741485562,
                 "cloud_online": true,
                 "ip": "192.168.1.186",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204663560": {
                 "id": 543204663560,
@@ -1368,7 +1368,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.117",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "5432045e0e1c": {
                 "id": "5432045e0e1c",
@@ -1389,7 +1389,7 @@
                 "cloud_online": true,
                 "modified": 1742862358,
                 "ip": "192.168.1.122",
-                "ssid": "GondorIot"
+                "ssid": ""
             },
             "543204622240": {
                 "id": 543204622240,
@@ -1410,7 +1410,7 @@
                 "cloud_online": true,
                 "modified": 1741485560,
                 "ip": "192.168.1.190",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da2462d20": {
                 "id": "cc8da2462d20",
@@ -1431,7 +1431,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.189",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da24554f0": {
                 "id": "cc8da24554f0",
@@ -1452,7 +1452,7 @@
                 "cloud_online": true,
                 "modified": 1743220838,
                 "ip": "192.168.1.174",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320467c304": {
                 "id": "54320467c304",
@@ -1473,7 +1473,7 @@
                 "cloud_online": true,
                 "modified": 1741485563,
                 "ip": "192.168.1.171",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204650bac": {
                 "id": "543204650bac",
@@ -1494,7 +1494,7 @@
                 "cloud_online": false,
                 "modified": 1741485566,
                 "ip": "192.168.1.194",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320463e668": {
                 "id": "54320463e668",
@@ -1515,7 +1515,7 @@
                 "cloud_online": true,
                 "modified": 1742996766,
                 "ip": "192.168.1.191",
-                "ssid": "Gondor",
+                "ssid": "",
                 "name_sync": true
             },
             "34b7da8bebe4": {
@@ -1537,7 +1537,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.187",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20bb4_3": {
                 "id": "80646fe20bb4_3",
@@ -1557,7 +1557,7 @@
                 "bundle": false,
                 "ip": "192.168.1.110",
                 "modified": 1727312814,
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20978_3": {
                 "id": "80646fe20978_3",
@@ -1577,7 +1577,7 @@
                 "jti": "",
                 "modified": 1741485565,
                 "ip": "192.168.1.141",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204652e40": {
                 "id": "543204652e40",
@@ -1598,7 +1598,7 @@
                 "cloud_online": true,
                 "modified": 1741485563,
                 "ip": "192.168.1.139",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "5432046661ec": {
                 "id": "5432046661ec",
@@ -1619,7 +1619,7 @@
                 "cloud_online": true,
                 "modified": 1727069247,
                 "ip": "192.168.1.154",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da245eb84": {
                 "id": "cc8da245eb84",
@@ -1639,7 +1639,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.133",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "34b7dac980ec": {
@@ -1661,7 +1661,7 @@
                 "cloud_online": true,
                 "modified": 1741485562,
                 "ip": "192.168.1.140",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "5432046668e0": {
                 "id": "5432046668e0",
@@ -1682,7 +1682,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.197",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20978_2": {
                 "id": "80646fe20978_2",
@@ -1702,7 +1702,7 @@
                 "jti": "",
                 "modified": 1741485566,
                 "ip": "192.168.1.141",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da2433c90": {
                 "id": "cc8da2433c90",
@@ -1723,7 +1723,7 @@
                 "cloud_online": true,
                 "modified": 1741485562,
                 "ip": "192.168.1.156",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204653af4": {
                 "id": "543204653af4",
@@ -1743,7 +1743,7 @@
                 "jti": "",
                 "modified": 1741485566,
                 "ip": "192.168.1.102",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "543204644b48": {
@@ -1765,7 +1765,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.155",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da2454cd8": {
                 "id": "cc8da2454cd8",
@@ -1786,7 +1786,7 @@
                 "cloud_online": false,
                 "modified": 1742862835,
                 "ip": "192.168.1.159",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da2462964": {
                 "id": "cc8da2462964",
@@ -1807,7 +1807,7 @@
                 "cloud_online": false,
                 "modified": 1742872874,
                 "ip": "192.168.1.193",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20b10_1": {
                 "id": "80646fe20b10_1",
@@ -1827,7 +1827,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.108",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "54320465711c": {
                 "id": "54320465711c",
@@ -1848,7 +1848,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.121",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da245682c": {
                 "id": "cc8da245682c",
@@ -1869,7 +1869,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.113",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "5432046452a0": {
                 "id": "5432046452a0",
@@ -1890,7 +1890,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.180",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "543204654cf0": {
                 "id": "543204654cf0",
@@ -1911,7 +1911,7 @@
                 "cloud_online": true,
                 "modified": 1741485566,
                 "ip": "192.168.1.114",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "34b7dac9728c": {
                 "id": "34b7dac9728c",
@@ -1931,7 +1931,7 @@
                 "jti": "",
                 "modified": 1741485564,
                 "ip": "192.168.1.179",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": true
             },
             "cc8da245b308": {
@@ -1953,7 +1953,7 @@
                 "cloud_online": true,
                 "modified": 1737671094,
                 "ip": "192.168.1.123",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "34b7da8bcf9c": {
                 "id": "34b7da8bcf9c",
@@ -1974,7 +1974,7 @@
                 "cloud_online": true,
                 "modified": 1741485567,
                 "ip": "192.168.1.132",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "5432046235a8": {
                 "id": "5432046235a8",
@@ -1995,7 +1995,7 @@
                 "cloud_online": true,
                 "modified": 1742874103,
                 "ip": "192.168.1.128",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "34b7da8e5c14": {
                 "id": "34b7da8e5c14",
@@ -2016,7 +2016,7 @@
                 "cloud_online": true,
                 "modified": 1741485565,
                 "ip": "192.168.1.166",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "cc8da2462048": {
                 "id": "cc8da2462048",
@@ -2037,7 +2037,7 @@
                 "cloud_online": true,
                 "modified": 1741485567,
                 "ip": "192.168.1.126",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "80646fe20f94_2": {
                 "id": "80646fe20f94_2",
@@ -2057,7 +2057,7 @@
                 "jti": "",
                 "modified": 1737671094,
                 "ip": "192.168.1.176",
-                "ssid": "Gondor"
+                "ssid": ""
             },
             "b8d61a87ecf0": {
                 "id": "b8d61a87ecf0",
@@ -2077,7 +2077,7 @@
                 "jti": "",
                 "modified": 1741485613,
                 "ip": "192.168.1.175",
-                "ssid": "Gondor",
+                "ssid": "",
                 "cloud_online": false
             }
         }

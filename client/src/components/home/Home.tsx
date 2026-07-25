@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faWifi, faSitemap, faMicrochip, faTowerBroadcast } from "@fortawesome/free-solid-svg-icons";
+import { faWifi, faSitemap, faMicrochip, faTowerBroadcast, faKey } from "@fortawesome/free-solid-svg-icons";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { useNavigate } from "react-router-dom";
 import style from "./home.module.css";
@@ -35,6 +35,12 @@ const tiles: Tile[] = [
         label: "MQTT Browser",
         description: "Browse MQTT topics and messages",
         icon: faTowerBroadcast,
+    },
+    {
+        path: "/wifi",
+        label: "WiFi Credentials",
+        description: "Save network names and passwords",
+        icon: faKey,
     },
 ];
 

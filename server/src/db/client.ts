@@ -31,4 +31,12 @@ export const ensureSchema = async (): Promise<void> => {
             bundle boolean DEFAULT false
         );
     `;
+    await queryClient`
+        CREATE TABLE IF NOT EXISTS wifi_credentials (
+            id serial PRIMARY KEY,
+            ssid text NOT NULL UNIQUE,
+            password text NOT NULL,
+            modified timestamp NOT NULL DEFAULT now()
+        );
+    `;
 };

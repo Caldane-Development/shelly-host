@@ -5,7 +5,7 @@ import {
   text,
   boolean,
   timestamp,
-  jsonb, varchar, bigint
+  jsonb, varchar, bigint, serial
 } from 'drizzle-orm/pg-core';
 
 export const rooms = pgTable('rooms', {
@@ -39,4 +39,11 @@ export const devices = pgTable('devices', {
   ip: varchar('ip', { length: 45 }).notNull(),  // IPv4/IPv6 max length 45 chars
   ssid: text('ssid').notNull(),
   bundle: boolean('bundle').default(false),  // optional field, default false
+});
+
+export const wifiCredentials = pgTable('wifi_credentials', {
+  id: serial('id').primaryKey(),
+  ssid: text('ssid').notNull().unique(),
+  password: text('password').notNull(),
+  modified: timestamp('modified', { mode: 'date' }).notNull().defaultNow(),
 });
