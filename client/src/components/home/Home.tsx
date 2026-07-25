@@ -1,11 +1,11 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWifi, faSitemap, faMicrochip, faTowerBroadcast } from "@fortawesome/free-solid-svg-icons";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { useNavigate } from "react-router-dom";
 import style from "./home.module.css";
-import { View } from "../../App";
 
 interface Tile {
-    view: View;
+    path: string;
     label: string;
     description: string;
     icon: IconDefinition;
@@ -13,45 +13,43 @@ interface Tile {
 
 const tiles: Tile[] = [
     {
-        view: "scanner",
+        path: "/scanner",
         label: "Scanner",
         description: "Discover Shelly devices on your network",
         icon: faWifi,
     },
     {
-        view: "site-configs",
+        path: "/site-configs",
         label: "Site Configs",
         description: "Manage site and room configuration",
         icon: faSitemap,
     },
     {
-        view: "devices",
+        path: "/devices",
         label: "Devices",
         description: "View and manage registered devices",
         icon: faMicrochip,
     },
     {
-        view: "mqtt-browser",
+        path: "/mqtt-browser",
         label: "MQTT Browser",
         description: "Browse MQTT topics and messages",
         icon: faTowerBroadcast,
     },
 ];
 
-interface HomeProps {
-    onNavigate: (view: View) => void;
-}
+const Home = () => {
+    const navigate = useNavigate();
 
-const Home = ({ onNavigate }: HomeProps) => {
     return (
         <section className={style.home}>
             <h1>Shelly Host</h1>
             <div className={style.tiles}>
                 {tiles.map((tile) => (
                     <button
-                        key={tile.view}
+                        key={tile.path}
                         className={style.tile}
-                        onClick={() => onNavigate(tile.view)}
+                        onClick={() => navigate(tile.path)}
                     >
                         <FontAwesomeIcon icon={tile.icon} className={style.icon} />
                         <span className={style.label}>{tile.label}</span>

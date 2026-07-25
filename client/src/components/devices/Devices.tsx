@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import style from "./devices.module.css";
 import { BACKEND_URL } from "../../constants/env";
-import { View } from "../../App";
 
 interface StoredDevice {
     id: string;
@@ -12,11 +12,8 @@ interface StoredDevice {
     ssid: string;
 }
 
-interface DevicesProps {
-    onNavigate: (view: View) => void;
-}
-
-const Devices = ({ onNavigate }: DevicesProps) => {
+const Devices = () => {
+    const navigate = useNavigate();
     const [devices, setDevices] = useState<StoredDevice[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -54,7 +51,7 @@ const Devices = ({ onNavigate }: DevicesProps) => {
                     <p>No devices have been registered yet.</p>
                     <p>
                         Try the{" "}
-                        <button className={style.link} onClick={() => onNavigate("scanner")}>
+                        <button className={style.link} onClick={() => navigate("/scanner")}>
                             Scanner
                         </button>{" "}
                         first to discover devices on your network.
