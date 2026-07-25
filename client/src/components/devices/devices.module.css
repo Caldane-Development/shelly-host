@@ -1,0 +1,73 @@
+section.devices {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.device-list {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.device {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 8px;
+  background-color: #1a1a1a;
+}
+
+.device .name {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.device .meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  color: #888;
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: #888;
+}
+
+.empty .link {
+  background: none;
+  border: none;
+  color: #646cff;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.empty .link:hover {
+  color: #535bf2;
+  border-color: transparent;
+}
+
+.loading {
+  color: #888;
+}
+
+@media (prefers-color-scheme: light) {
+  .device {
+    background-color: #f9f9f9;
+  }
+}

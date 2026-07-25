@@ -1,13 +1,13 @@
 services:
   mqtt:
-    image: registry.caldane.net/shelly-host-mqtt:latest
+    image: eclipse-mosquitto:2
     container_name: mqtt
     ports:
       - "1884:1883"
       - "9002:9001"
     volumes:
       - mosquitto_data:/mosquitto/data
-      - mosquitto_config:/mosquitto/config
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "mosquitto_pub -h localhost -t healthcheck -m ok || exit 1"]
@@ -68,14 +68,10 @@ services:
       timeout: 5s
       retries: 5
 
-  common:
-    image: registry.caldane.net/shelly-host-common:latest    
-    container_name: shelly-common
-    volumes:
-      - shared_common:/app/data
-    restart: "no"
-
   server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
     image: registry.caldane.net/shelly-host-server:latest
     container_name: shelly-server
     environment:
@@ -84,11 +80,8 @@ services:
       CLIENT_URL: "$CLIENT_URL"
       SHELLY_CLOUD_AUTH_KEY: "$SHELLY_CLOUD_AUTH_KEY"
       VHOST_PREFIX: "$VHOST_PREFIX"
-    volumes:
-      - shared_common:/app/common:ro
+      DATABASE_URL: "postgres://shelly-user:${DB_PASSWORD}@postgres:5432/shelly_db"
     depends_on:
-      common:
-        condition: service_completed_successfully
       mqtt:
         condition: service_healthy
       postgres:
@@ -105,9 +98,15 @@ services:
       retries: 15
 
   client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      target: runtime
+      args:
+        VITE_APP_BACKEND: "$VITE_APP_BACKEND"
+        VITE_APP_NAME: "$VITE_APP_NAME"
     image: registry.caldane.net/shelly-host-client:latest
     container_name: shelly-client
-    entrypoint: ["/entrypoint.sh"]
     environment:
       VITE_APP_BACKEND: "$VITE_APP_BACKEND"
       VITE_APP_NAME: "$VITE_APP_NAME"
@@ -115,12 +114,11 @@ services:
       server:
         condition: service_healthy
     restart: unless-stopped
+    tty: true
     ports:
       - "4501:4501"
 
 volumes:
   mosquitto_data:
-  mosquitto_config:
   postgres_data:
   loki_data:
-  shared_common:

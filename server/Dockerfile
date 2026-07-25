@@ -5,14 +5,15 @@ RUN apt install -y curl
 
 EXPOSE 4500
 
-RUN mkdir -p /app/server
+RUN mkdir -p /app/server /app/common
 
 WORKDIR /app/server
 
-COPY package*.json ./
+COPY server/package*.json ./
 
 RUN npm i
 
-COPY . .
+COPY server ./
+COPY common /app/common
 
 CMD ["npm", "run", "dev"]

@@ -1,10 +1,7 @@
 # === Build stage ===
 FROM node:24 AS builder
-
-# 👇 Declare build-time variable
 ARG VITE_APP_BACKEND
 ARG VITE_APP_NAME
-
 ENV VITE_APP_BACKEND=$VITE_APP_BACKEND
 ENV VITE_APP_NAME=$VITE_APP_NAME
 
@@ -21,7 +18,7 @@ COPY common ./common
 RUN cd client && npm rebuild rollup && npm run build
 
 # === Runtime stage ===
-FROM node:24
+FROM node:24 AS runtime
 
 RUN npm install -g serve
 WORKDIR /app
@@ -40,3 +37,15 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 # This is still your main server command
 CMD ["serve", "-s", "dist", "-l", "4501"]
+
+# === Dev stage (hot reload via Vite dev server) ===
+FROM node:24 AS dev
+
+WORKDIR /app/client
+
+COPY client/package*.json ./
+RUN npm install
+
+EXPOSE 4501
+
+CMD ["npm", "run", "dev"]

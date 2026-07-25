@@ -1,0 +1,111 @@
+section.mqtt-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.status .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #888;
+}
+
+.status.connected .dot {
+  background-color: #30a46c;
+}
+
+.status.error .dot {
+  background-color: #e5484d;
+}
+
+.filter {
+  padding: 0.5em 0.8em;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background-color: #1a1a1a;
+  color: inherit;
+  font-size: 0.95em;
+  min-width: 220px;
+}
+
+.messages {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background-color: #1a1a1a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.message .meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.message .topic {
+  color: #646cff;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.message .time {
+  color: #888;
+  font-size: 0.75rem;
+}
+
+.message .payload {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.empty {
+  color: #888;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: light) {
+  .filter,
+  .message {
+    background-color: #f9f9f9;
+  }
+  .message .payload {
+    color: #213547;
+  }
+}

@@ -5,10 +5,15 @@ import expressWinston from "express-winston";
 import { logEnv, logger } from "./logger";
 
 import { init } from "./utils/server.helper";
+import { ensureSchema } from "./db/client";
 
 
 
 logger.info(`[server]: Environment: ${process.env.NODE_ENV}`, { PORT: process.env.PORT, MQTT_URL: process.env.MQTT_URL });
+
+ensureSchema()
+    .then(() => logger.info("[server]: Database schema ensured"))
+    .catch((error) => logger.error(`[server]: Failed to ensure database schema: ${error}`));
 
 const app: Express = express();
 const port = process.env.PORT || 3000;

@@ -9,6 +9,7 @@ import { composeShellyDevice, shellyActivateMqtt, shellyActivateWebhook, shellyG
 import { MqttResponse } from "../../../common/models/mqtt.interface";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
 import { mqttAddListener, mqtt as mqttClient } from "../utils/mqtt.helper";
+import { getStoredDevices, saveDiscoveredDevices } from "../utils/device.helper";
 
 export const shellyRouter = Router();
 
@@ -119,6 +120,18 @@ shellyRouter.get("/discover", async (req: Request, res: Response) => {
 
     res.write(`data: ${JSON.stringify(data)}\n\n`);
     res.end();
+
+    await saveDiscoveredDevices(data.devices);
+});
+
+shellyRouter.get("/devices", async (_: Request, res: Response) => {
+    try {
+        const storedDevices = await getStoredDevices();
+        res.json(storedDevices);
+    } catch (error) {
+        logger.error(`[server]: Failed to fetch devices: ${error}`);
+        res.status(500).send("Failed to fetch devices");
+    }
 });
 
 shellyRouter.post("/:ip/mqtt", async (req: Request, res: Response) => {

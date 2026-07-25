@@ -38,6 +38,15 @@ const STATUS_MESSAGE = {
 } as const;
 
 const listeners: ((device: IDevice) => void)[] = [];
+
+export interface MqttMonitorMessage {
+    topic: string;
+    message: string;
+    timestamp: string;
+}
+
+const monitors: Map<string, (message: MqttMonitorMessage) => void> = new Map();
+
 const client = mqttLibrary.connect(process.env.MQTT_URL as string);
 logger.info(`[server]: MQTT Server is running at ${process.env.MQTT_URL}`);
 
@@ -48,9 +57,34 @@ client.on("connect", () => {
         }
         logger.info(`[server]: Subscribed to MQTT channel: ${site.buffington.name}`);
     });
+
+    // Subscribe to all topics so the MQTT browser can monitor broker traffic
+    client.subscribe("#", (err) => {
+        if (err) {
+            logger.error(`[server]: Failed to subscribe to monitor channel: ${err}`);
+            return;
+        }
+        logger.info(`[server]: Subscribed to monitor channel: #`);
+    });
 });
 
 client.on("message", (topic, message) => {
+    // Forward every message to any active monitors before other processing
+    if (monitors.size > 0) {
+        const monitorMessage: MqttMonitorMessage = {
+            topic,
+            message: message.toString(),
+            timestamp: new Date().toISOString(),
+        };
+        monitors.forEach((monitor) => {
+            try {
+                monitor(monitorMessage);
+            } catch (error) {
+                logger.error(`[server]: Failed to forward MQTT message to monitor: ${error}`);
+            }
+        });
+    }
+
     const [topicSite, topicChannel] = topic.split(".");
 
     if (message.length === 0) {
@@ -102,6 +136,16 @@ client.on("message", (topic, message) => {
 export const mqttAddListener = (id: string, callback: (device: IDevice) => void) => {
     listeners.push(callback);
     logger.info(`[server]: Added MQTT site listener: ${id}`);
+};
+
+export const mqttAddMonitor = (id: string, callback: (message: MqttMonitorMessage) => void) => {
+    monitors.set(id, callback);
+    logger.info(`[server]: Added MQTT monitor: ${id}`);
+};
+
+export const mqttRemoveMonitor = (id: string) => {
+    monitors.delete(id);
+    logger.info(`[server]: Removed MQTT monitor: ${id}`);
 };
 
 export const mqtt = {

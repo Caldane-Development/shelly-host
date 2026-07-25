@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Request, Response } from "express";
 import { logger } from "../logger";
-import { createMqttConfig, mqtt } from "../utils/mqtt.helper";
+import { createMqttConfig, mqtt, mqttAddMonitor, mqttRemoveMonitor } from "../utils/mqtt.helper";
 import { channelDictionary } from "../utils/channel.helper";
 import roomList from "../assets/json/room-list.json";
 
@@ -9,6 +9,25 @@ export const messageRouter = Router();
 
 messageRouter.get("/", (_: Request, res: Response) => {
     res.send("<h1>MQTT Server</h1><p>Use /channel/:channel/message/:message/:clientName to send a message to a channel</p>");
+});
+
+messageRouter.get("/monitor", (req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const monitorId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    logger.info(`[server]: MQTT monitor connected: ${monitorId}`);
+
+    mqttAddMonitor(monitorId, (message) => {
+        res.write(`data: ${JSON.stringify(message)}\n\n`);
+    });
+
+    req.on("close", () => {
+        mqttRemoveMonitor(monitorId);
+        logger.info(`[server]: MQTT monitor disconnected: ${monitorId}`);
+    });
 });
 
 messageRouter.post("/client/:clientName", (req: Request, res: Response) => {

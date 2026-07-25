@@ -1,0 +1,17 @@
+# Development override for hot reload.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d client
+services:
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      target: dev
+    image: shelly-host-client:dev
+    environment:
+      VITE_APP_BACKEND: "$VITE_APP_BACKEND"
+      VITE_APP_NAME: "$VITE_APP_NAME"
+    volumes:
+      - ./client:/app/client
+      - ./common:/app/common
+      - /app/client/node_modules
+    command: ["npm", "run", "dev"]

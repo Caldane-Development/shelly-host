@@ -5,6 +5,8 @@ export interface ISites {
 export interface Site {
   name: string
   description: string
+  mqtt: string
+  webhook: string
   address: Address
   rooms: Rooms
 }

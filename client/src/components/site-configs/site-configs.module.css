@@ -1,0 +1,89 @@
+section.site-configs {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.panel {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.add-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-form input {
+  flex: 1;
+  padding: 0.6em 0.8em;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background-color: #1a1a1a;
+  color: inherit;
+  font-size: 1em;
+}
+
+.add-form input.invalid {
+  border-color: #e5484d;
+}
+
+.error {
+  color: #e5484d;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.network-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.network-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 8px;
+  background-color: #1a1a1a;
+}
+
+.network-list .network-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+}
+
+button.remove {
+  background: transparent;
+  border: none;
+  color: #e5484d;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+
+button.remove:hover {
+  border-color: transparent;
+  color: #ff6166;
+}
+
+.empty {
+  color: #888;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: light) {
+  .add-form input,
+  .network-list li {
+    background-color: #f9f9f9;
+  }
+}
