@@ -12,14 +12,27 @@ jobs:
     steps:
       - name: Network + docker inspection
         run: |
-          echo "=== host ==="; hostname; ip -4 addr show | grep -E "inet " | grep -v 127.0.0.1
-          echo "=== docker networks (subnets) ==="
-          for n in $(docker network ls -q); do
-            docker network inspect "$n" --format '{{.Name}} [{{.Driver}}]: {{range .IPAM.Config}}{{.Subnet}} {{end}}'
-          done
-          echo "=== host routes ==="; ip route
-          echo "=== route lookup 192.168.1.15 (perceptor) ==="; ip route get 192.168.1.15 || true
-          echo "=== reach perceptor:9001 (agent) ==="; timeout 3 bash -c 'echo >/dev/tcp/192.168.1.15/9001' 2>/dev/null && echo OPEN || echo UNREACHABLE
-          echo "=== ping perceptor ==="; ping -c1 -W2 192.168.1.15 >/dev/null 2>&1 && echo OK || echo FAIL
-          echo "=== ping a shelly-range host 192.168.1.1 (gw) ==="; ping -c1 -W2 192.168.1.1 >/dev/null 2>&1 && echo OK || echo FAIL
-          echo "=== docker-managed iptables NAT (192.168) ==="; sudo iptables -t nat -S 2>/dev/null | grep -E "192\.168\.1" || echo "(none / no sudo)"
+          echo "########## RUNNER HOST (10.10.10.29) ##########"
+          hostname; ip -4 addr show | grep -E "inet " | grep -v 127.0.0.1
+          echo "=== runner -> 192.168.1.15 ==="; ping -c1 -W2 192.168.1.15 >/dev/null 2>&1 && echo OK || echo FAIL
+
+          echo
+          echo "########## PROD HOST (10.10.10.28, where the stacks run) ##########"
+          SSH="ssh -T -o BatchMode=yes -o StrictHostKeyChecking=no -i ~/.ssh/github_runner_key github-runner@10.10.10.28"
+          $SSH 'bash -s' <<'EOF'
+            echo "=== host ==="; hostname; ip -4 addr show | grep -E "inet " | grep -v 127.0.0.1
+            echo "=== docker networks (subnets) ==="
+            for n in $(docker network ls -q); do
+              docker network inspect "$n" --format '{{.Name}} [{{.Driver}}]: {{range .IPAM.Config}}{{.Subnet}} {{end}}'
+            done
+            echo "=== any docker net overlapping 192.168.1 ==="
+            docker network ls -q | xargs -I{} docker network inspect {} --format '{{.Name}}: {{range .IPAM.Config}}{{.Subnet}} {{end}}' | grep -E "192\.168\.1" || echo "(NONE overlap 192.168.1)"
+            echo "=== host routes ==="; ip route
+            echo "=== route lookup 192.168.1.15 ==="; ip route get 192.168.1.15 || true
+            echo "=== ping 192.168.1.15 (perceptor) ==="; ping -c1 -W2 192.168.1.15 >/dev/null 2>&1 && echo OK || echo FAIL
+            echo "=== ping 192.168.1.1 (gw) ==="; ping -c1 -W2 192.168.1.1 >/dev/null 2>&1 && echo OK || echo FAIL
+            echo "=== reach perceptor mqtt 192.168.1.15:1884 ==="; timeout 3 bash -c 'echo >/dev/tcp/192.168.1.15/1884' 2>/dev/null && echo OPEN || echo UNREACHABLE
+            echo "=== ip rules ==="; ip rule 2>/dev/null
+            echo "=== interfaces ==="; ip -4 -o addr show | awk '{print $2, $4}'
+EOF
+
