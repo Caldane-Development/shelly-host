@@ -71,6 +71,7 @@ jobs:
           DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
         run: |
           set -euo pipefail
+          mkdir -p "$DEPLOY_PATH"
           cp docker-compose.yml docker-compose.prod.yml "$DEPLOY_PATH"/
           cd "$DEPLOY_PATH"
           export IMAGE_TAG
