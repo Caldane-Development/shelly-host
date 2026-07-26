@@ -5,11 +5,12 @@ import roomList from "../assets/json/room-list.json";
 import config from "../assets/json/config.json";
 import { logger } from "../logger";
 import os from "os";
-import { composeShellyDevice, shellyActivateMqtt, shellyActivateWebhook, shellyGetMqttSettings, shellyReboot, shellyWebhookList } from "../utils/discovery.helper";
+import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyGetMqttSettings, shellyReboot, shellyWebhookList } from "../utils/discovery.helper";
 import { MqttResponse } from "../../../common/models/mqtt.interface";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
 import { mqttAddListener, mqtt as mqttClient } from "../utils/mqtt.helper";
-import { getStoredDevices, saveDiscoveredDevices } from "../utils/device.helper";
+import { getStoredDevices, getStoredIDevices, getEnabledDevices, saveDiscoveredDevices } from "../utils/device.helper";
+import { getStoredRooms, saveDiscoveredRooms } from "../utils/room.helper";
 
 export const shellyRouter = Router();
 
@@ -122,6 +123,17 @@ shellyRouter.get("/discover", async (req: Request, res: Response) => {
     res.end();
 
     await saveDiscoveredDevices(data.devices);
+    await saveDiscoveredRooms(data.devices);
+});
+
+shellyRouter.get("/rooms", async (_: Request, res: Response) => {
+    try {
+        const storedRooms = await getStoredRooms();
+        res.json(storedRooms);
+    } catch (error) {
+        logger.error(`[server]: Failed to fetch rooms: ${error}`);
+        res.status(500).send("Failed to fetch rooms");
+    }
 });
 
 shellyRouter.get("/devices", async (_: Request, res: Response) => {
@@ -134,15 +146,48 @@ shellyRouter.get("/devices", async (_: Request, res: Response) => {
     }
 });
 
+shellyRouter.get("/devices/detailed", async (_: Request, res: Response) => {
+    try {
+        const storedDevices = await getStoredIDevices();
+        res.json(storedDevices);
+    } catch (error) {
+        logger.error(`[server]: Failed to fetch detailed devices: ${error}`);
+        res.status(500).send("Failed to fetch detailed devices");
+    }
+});
+
+// Query live switch status for every MQTT-enabled stored device over HTTP (the
+// same source the scanner uses) and return it directly. This avoids relying on
+// MQTT broker topology, which may differ per device.
+shellyRouter.get("/devices/status", async (_: Request, res: Response) => {
+    try {
+        const enabledDevices = await getEnabledDevices();
+        const statuses = await Promise.all(
+            enabledDevices.map(async (device) => {
+                const result = await discoverShelly(device.ip);
+                return { id: device.id.toString(), ip: device.ip, output: Boolean(result?.["switch:0"]?.output) };
+            })
+        );
+        res.json(statuses);
+    } catch (error) {
+        logger.error(`[server]: Failed to fetch device statuses: ${error}`);
+        res.status(500).send("Failed to fetch device statuses");
+    }
+});
+
 shellyRouter.post("/:ip/mqtt", async (req: Request, res: Response) => {
     logger.info(`[server]: Activating MQTT for device with IP: ${req.params.ip}`);
     const ip = req.params.ip;
     const device: IDevice = req.body.device;
+    const server: string | undefined = req.body.server;
+    const topicPrefix: string | undefined = req.body.topicPrefix;
 
-    const mqtt = await shellyActivateMqtt(ip, device);
+    const mqtt = await shellyActivateMqtt(ip, device, { server, topicPrefix });
     logger.info(`[server]: MQTT activation response for ${ip}: ${JSON.stringify(mqtt)}`);
     if (mqtt) {
         await shellyReboot(ip);
+
+        await saveDiscoveredDevices([mqtt]);
 
         mqttClient.status(mqtt.device);
     } else {

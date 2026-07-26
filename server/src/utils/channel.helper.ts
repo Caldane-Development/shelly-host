@@ -59,7 +59,7 @@ export const sendMessageToDevices = (siteName: string, roomName: string, deviceN
 
   devices?.forEach((device) => {
     const mqttChannel = `${site.name}/${room.name}/${device.name}/command/switch:${device.channel}`;
-    logger.info(`[server]: Publish mqtt message: ${mqttChannel} \n    ${message}`);
+    logger.request(`[server]: Publish mqtt message: ${mqttChannel} \n    ${message}`);
     mqtt.publish(clientName, mqttChannel, message);
   });
 }

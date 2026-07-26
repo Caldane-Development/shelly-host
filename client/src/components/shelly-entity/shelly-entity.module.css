@@ -14,12 +14,29 @@ section.shelly-entity {
         cursor: pointer;
     }
 
+    b {
+        font-size: .9rem;
+        text-wrap-mode: nowrap;
+    }
+
     p {
         margin: 0;
         display: flex;
         justify-content: space-between;
         width: 100%;
         gap: 1rem;
+
+        &.topic {
+            .topic-value {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                min-width: 0;
+                cursor: pointer;
+                text-align: right;
+                max-width: 15ch;
+            }
+        }
 
         &.tools {
             align-items: start;
@@ -65,3 +82,137 @@ section.shelly-entity {
         }
     }
 }
+
+button.enable-mqtt {
+    background: #3b82f6;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.dialog {
+    background: #1f2937;
+    color: #f9fafb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    width: 100%;
+    max-width: 420px;
+    padding: 1.25rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.dialog-header h4 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+button.dialog-close {
+    background: transparent;
+    color: #f9fafb;
+    padding: 0.25rem 0.5rem;
+}
+
+.dialog-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+}
+
+.dialog-field select,
+.dialog-field input {
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #4b5563;
+    background: #111827;
+    color: #f9fafb;
+    font-size: 0.9rem;
+}
+
+.dialog-field input:disabled {
+    opacity: 0.6;
+}
+
+.dialog-toggle {
+    display: flex;
+    gap: 0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.dialog-toggle button {
+    flex: 1;
+    background: #374151;
+    color: #d1d5db;
+    border-radius: 0;
+    padding: 0.5rem;
+}
+
+.dialog-toggle button.toggle-active {
+    background: #3b82f6;
+    color: white;
+}
+
+.dialog-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+}
+
+.dialog-preview code {
+    background: #111827;
+    padding: 0.5rem;
+    border-radius: 4px;
+    word-break: break-all;
+    color: #93c5fd;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+button.dialog-cancel {
+    background: #4b5563;
+}
+
+button.dialog-submit {
+    background: #3b82f6;
+}
+
+button.dialog-submit:disabled,
+button.dialog-cancel:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.error {
+    color: #f87171;
+    font-size: 0.85rem;
+    margin: 0;
+}
+

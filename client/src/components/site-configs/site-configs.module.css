@@ -14,6 +14,19 @@ section.site-configs {
   text-align: left;
 }
 
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  width: 100%;
+  max-width: 1160px;
+  align-items: start;
+}
+
+.grid .panel {
+  max-width: none;
+}
+
 .add-form {
   display: flex;
   gap: 0.5rem;
@@ -81,9 +94,200 @@ button.remove:hover {
   font-style: italic;
 }
 
+.panel-title {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.suggestions-label {
+  margin: 0;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+button.chip {
+  padding: 0.4em 0.75em;
+  border-radius: 999px;
+  border: 1px solid rgba(100, 108, 255, 0.5);
+  background-color: rgba(100, 108, 255, 0.12);
+  color: inherit;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+button.chip:hover:not(:disabled) {
+  border-color: #646cff;
+  background-color: rgba(100, 108, 255, 0.25);
+}
+
+button.chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.broker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.broker-form input {
+  width: 100%;
+  padding: 0.6em 0.8em;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background-color: #1a1a1a;
+  color: inherit;
+  font-size: 1em;
+}
+
+.broker-form input.invalid {
+  border-color: #e5484d;
+}
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field input {
+  flex: 1;
+  padding-right: 2.5em;
+}
+
+button.toggle-visibility {
+  position: absolute;
+  right: 0.25rem;
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+
+button.toggle-visibility:hover {
+  border-color: transparent;
+  color: inherit;
+}
+
+.broker-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.broker-meta {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.broker-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.broker-actions button.toggle-visibility {
+  position: static;
+}
+
+.ssid-field {
+  position: relative;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ssid-field input {
+  flex: 1;
+  padding: 0.6em 0.8em;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background-color: #1a1a1a;
+  color: inherit;
+  font-size: 1em;
+}
+
+button.search-ssid {
+  background: transparent;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 8px;
+  color: #888;
+  cursor: pointer;
+  padding: 0 0.75rem;
+}
+
+button.search-ssid:hover:not(:disabled) {
+  color: #ccc;
+}
+
+button.search-ssid:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ssid-picker {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 8px;
+  background-color: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.ssid-picker li button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+}
+
+.ssid-picker li button:hover {
+  background-color: rgba(128, 128, 128, 0.2);
+}
+
+.ssid-picker-empty {
+  padding: 0.5rem 0.6rem;
+  color: #888;
+  font-style: italic;
+}
+
 @media (prefers-color-scheme: light) {
   .add-form input,
+  .broker-form input,
+  .ssid-field input,
   .network-list li {
     background-color: #f9f9f9;
+  }
+
+  .ssid-picker {
+    background-color: #ffffff;
   }
 }

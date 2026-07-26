@@ -7,7 +7,7 @@ import ShellyScanner from "./components/shelly-scanner/ShellyScanner";
 import SiteConfigs from "./components/site-configs/SiteConfigs";
 import MqttBrowser from "./components/mqtt-browser/MqttBrowser";
 import Devices from "./components/devices/Devices";
-import WifiCredentials from "./components/wifi-credentials/WifiCredentials";
+import Rooms from "./components/rooms/Rooms";
 
 function App() {
     return (
@@ -25,8 +25,8 @@ function App() {
                 />
                 <Route path="/site-configs" element={<SiteConfigs />} />
                 <Route path="/devices" element={<Devices />} />
+                <Route path="/rooms" element={<Rooms />} />
                 <Route path="/mqtt-browser" element={<MqttBrowser />} />
-                <Route path="/wifi" element={<WifiCredentials />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

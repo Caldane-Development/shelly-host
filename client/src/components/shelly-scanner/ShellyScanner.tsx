@@ -9,12 +9,14 @@ import { RootState } from "../../store/store";
 
 const ShellyScanner = () => {
     const [progress, setProgress] = useState(0);
-    const [total, setTotal] = useState(null);
+    const [total, setTotal] = useState<number | null>(null);
     const [count, setCount] = useState(0);
     const [devices, setDevices] = useState<IDevice[]>([]);
     const [mode, setMode] = useState<string>("dev");
+    const [scanning, setScanning] = useState(false);
 
-    const ipAddress = useSelector((state: RootState) => state.scanner.ipAddress);
+    const scanId = useSelector((state: RootState) => state.scanner.scanId);
+    const scanTargets = useSelector((state: RootState) => state.scanner.scanTargets);
 
     useEffect(() => {
         const handleKeyPress = (() => {
@@ -52,39 +54,93 @@ const ShellyScanner = () => {
         };
     }, []);
 
-    useEffect(() => {
-        if (!ipAddress) {
-            console.warn("No IP address provided for Shelly scanner.");
-            return;
-        } else {
-            console.log(`Starting Shelly scan on IP: ${ipAddress}`);
-            setProgress(0);
-        }
-        
-        const eventSource = new EventSource(`${BACKEND_URL}/shelly/discover?ip=${ipAddress}`);
+    // Scan a single /24 range. Resolves with the devices found once the server
+    // reports the scan is complete.
+    const scanRange = (
+        ip: string,
+        onProgress: (completed: number, count: number, total: number) => void
+    ): Promise<IDevice[]> =>
+        new Promise((resolve) => {
+            const eventSource = new EventSource(`${BACKEND_URL}/shelly/discover?ip=${ip}`);
 
-        eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.total && total === null) {
-                setTotal(data.total);
-            }
-            if (data.count) {
-                setCount(data.count);
-            }
-            if (data.completed && total) {
-                setProgress((data.completed / total) * 100);
-            }
-            if (data.message === "Scan complete") {
-                setDevices(data.devices);
-                setProgress(100);
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.message === "Scan complete") {
+                    eventSource.close();
+                    resolve(data.devices ?? []);
+                    return;
+                }
+                onProgress(data.completed ?? 0, data.count ?? 0, data.total ?? 0);
+            };
+
+            eventSource.onerror = () => {
                 eventSource.close();
+                resolve([]);
+            };
+        });
+
+    // Run a scan whenever the user requests one (scanId increments per request).
+    useEffect(() => {
+        if (scanId === 0 || scanTargets.length === 0) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const run = async () => {
+            setDevices([]);
+            setProgress(0);
+            setCount(0);
+            setTotal(null);
+            setScanning(true);
+
+            const accumulated: IDevice[] = [];
+            let completedBase = 0;
+            let successBase = 0;
+
+            for (const ip of scanTargets) {
+                if (cancelled) {
+                    return;
+                }
+
+                let rangeTotal = 0;
+                let rangeCount = 0;
+
+                const found = await scanRange(ip, (completed, cnt, tot) => {
+                    if (cancelled) {
+                        return;
+                    }
+                    rangeTotal = tot;
+                    rangeCount = cnt;
+                    const overallTotal = tot * scanTargets.length;
+                    setTotal(overallTotal || null);
+                    setCount(successBase + cnt);
+                    if (overallTotal) {
+                        setProgress(((completedBase + completed) / overallTotal) * 100);
+                    }
+                });
+
+                if (cancelled) {
+                    return;
+                }
+
+                accumulated.push(...found);
+                completedBase += rangeTotal;
+                successBase += rangeCount;
+                setDevices([...accumulated]);
             }
+
+            setProgress(100);
+            setScanning(false);
         };
+
+        run();
 
         return () => {
-            eventSource.close();
+            cancelled = true;
         };
-    }, [total, ipAddress]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scanId]);
 
     useEffect(() => {
         const eventSource = new EventSource(`${BACKEND_URL}/shelly/listen`);
@@ -105,9 +161,15 @@ const ShellyScanner = () => {
     return (
         <section className={style["shelly-scanner"]}>
             <h2>Network Scanner</h2>
-            <ProgressBar progress={progress} />
-            <p>Progress: {total ? Math.round(progress) : "Loading..."}%</p>
-            <p>Successful Responses: {count}</p>
+            {scanId === 0 ? (
+                <p>Select a network range and click Scan to begin.</p>
+            ) : (
+                <>
+                    <ProgressBar progress={progress} />
+                    <p>Progress: {total ? Math.round(progress) : scanning ? "Loading..." : "0"}%</p>
+                    <p>Successful Responses: {count}</p>
+                </>
+            )}
             <article>
                 {devices &&
                     devices

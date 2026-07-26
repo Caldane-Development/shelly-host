@@ -22,11 +22,15 @@ const persistNetworks = (networks: string[]) => {
 interface ScannerState {
   ipAddress: string;
   networks: string[];
+  scanTargets: string[];
+  scanId: number;
 }
 
 const initialState: ScannerState = {
   ipAddress: "192.168.1.1", // Default or blank
   networks: loadNetworks(),
+  scanTargets: [],
+  scanId: 0,
 };
 
 export const scannerSlice = createSlice({
@@ -47,8 +51,12 @@ export const scannerSlice = createSlice({
       state.networks = state.networks.filter((n) => n !== action.payload);
       persistNetworks(state.networks);
     },
+    requestScan: (state, action: PayloadAction<string[]>) => {
+      state.scanTargets = action.payload;
+      state.scanId += 1;
+    },
   },
 });
 
-export const { setIpAddress, addNetwork, removeNetwork } = scannerSlice.actions;
+export const { setIpAddress, addNetwork, removeNetwork, requestScan } = scannerSlice.actions;
 export default scannerSlice.reducer;

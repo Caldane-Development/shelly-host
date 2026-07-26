@@ -38,7 +38,7 @@ messageRouter.post("/client/:clientName", (req: Request, res: Response) => {
         res.status(404).send("Channel not found");
         return;
     }
-    logger.info(`[server]: Publish mqtt message: ${message} \n    ${clientName}`);
+    logger.request(`[server]: Publish mqtt message: ${message} \n    ${clientName}`);
     mqtt.publish(clientName, mqttChannel, JSON.stringify(message));
     res.sendStatus(204);
 });
@@ -71,7 +71,7 @@ messageRouter.get("/srd/:siteName/:roomId/:deviceName/switch/message/:message/:c
         return;
     }
 
-    logger.info(`[server]: Publish mqtt message: ${mqttChannel} - ${message}`);
+    logger.request(`[server]: Publish mqtt message: ${mqttChannel} - ${message}`);
     mqtt.publish(clientName, mqttChannel, message);
     res.sendStatus(204);
 });
@@ -83,7 +83,7 @@ messageRouter.get("/channel/:channel/message/:message/:clientName", (req: Reques
         res.status(404).send("Channel not found");
         return;
     }
-    logger.info(`[server]: Publish mqtt message: ${mqttChannel} \n    ${message}`);
+    logger.request(`[server]: Publish mqtt message: ${mqttChannel} \n    ${message}`);
     mqtt.publish(clientName, mqttChannel, message);
     res.sendStatus(204);
 });

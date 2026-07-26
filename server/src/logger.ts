@@ -1,9 +1,41 @@
 import winston, { format, transports } from "winston";
 import LokiTransport from "winston-loki";
 
+// Custom log levels. Lower number = higher priority (always shown at stricter modes).
+// error/warn are always surfaced; `state` = device state changes; `request` = HTTP
+// requests and outgoing commands; `info`/`debug` are verbose-only chatter.
+const levels = {
+  error: 0,
+  warn: 1,
+  state: 2,
+  request: 3,
+  info: 4,
+  debug: 5,
+};
+
+// LOG_MODE maps a friendly name to the winston level threshold applied to the console.
+//   state   -> only state changes (plus errors/warnings)
+//   normal  -> state changes and requests
+//   verbose -> everything
+const LOG_MODES: Record<string, keyof typeof levels> = {
+  state: "state",
+  normal: "request",
+  verbose: "debug",
+};
+
+const mode = (process.env.LOG_MODE || "normal").toLowerCase();
+const consoleLevel = LOG_MODES[mode] || "request";
+
+type CustomLogger = winston.Logger & {
+  state: winston.LeveledLogMethod;
+  request: winston.LeveledLogMethod;
+};
+
 export const logger = winston.createLogger({
+  levels,
+  level: consoleLevel,
   transports: [
-    new transports.Console(),
+    new transports.Console({ level: consoleLevel }),
     new transports.File({
       level: 'info',
       filename: 'logs/info.log'
@@ -28,7 +60,10 @@ export const logger = winston.createLogger({
     format.metadata(),
     format.prettyPrint()
   )
-});
+}) as CustomLogger;
+
+logger.info(`[server]: Logging mode '${mode}' (console level: ${consoleLevel})`);
+
 
 export const logEnv = () => {
   const environment = [

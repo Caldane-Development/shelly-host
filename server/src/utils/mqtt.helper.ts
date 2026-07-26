@@ -1,12 +1,12 @@
 import * as mqttLibrary from "mqtt";
 import { logger } from "../logger";
-import site from "../assets/json/site.json";
 import deviceList from "../assets/json/device-list.json";
 import roomList from "../assets/json/room-list.json";
 import { Room } from "../../../common/models/sites.interface";
 import { MqttResult } from "../../../common/models/mqtt.interface";
 import { Device, IDevice } from "../../../common/models/device.interface";
 import { createIDevice } from "./device.helper";
+import { getSiteConfigCached } from "./site-config.helper";
 
 export interface SubscriptionResponse {
     id: string;
@@ -29,7 +29,6 @@ export interface StatusResult {
   
 
 const STATUS_MESSAGE = {
-    src: `${site.buffington.name}.status`,
     method: "Switch.GetStatus",
     params: {
         id: 0,
@@ -51,11 +50,12 @@ const client = mqttLibrary.connect(process.env.MQTT_URL as string);
 logger.info(`[server]: MQTT Server is running at ${process.env.MQTT_URL}`);
 
 client.on("connect", () => {
-    client.subscribe([`${site.buffington.name}.status/rpc`, `${site.buffington.name}.action/rpc`], (err) => {
+    const siteName = getSiteConfigCached().name;
+    client.subscribe([`${siteName}.status/rpc`, `${siteName}.action/rpc`], (err) => {
         if (err) {
             logger.error(`[server]: Failed to subscribe to MQTT channel: ${err}`);
         }
-        logger.info(`[server]: Subscribed to MQTT channel: ${site.buffington.name}`);
+        logger.info(`[server]: Subscribed to MQTT channel: ${siteName}`);
     });
 
     // Subscribe to all topics so the MQTT browser can monitor broker traffic
@@ -94,7 +94,7 @@ client.on("message", (topic, message) => {
         return;
     }
 
-    if(topicSite !== site.buffington.name) {
+    if(topicSite !== getSiteConfigCached().name) {
         logger.error(`[server]: Invalid topic site: ${topicSite}`);
         return;
     }
@@ -112,7 +112,7 @@ client.on("message", (topic, message) => {
         } catch (error) {
             logger.error(`[server]: Failed to parse message: ${error}`);
         }
-        logger.info(`[server]: Client ${topicSite} published message "${message.toString()}" to channel "${topic}"`);
+        logger.state(`[server]: Client ${topicSite} published message "${message.toString()}" to channel "${topic}"`);
     }
 
     if (topicChannel === "status/rpc") {
@@ -151,7 +151,7 @@ export const mqttRemoveMonitor = (id: string) => {
 export const mqtt = {
     publish: (clientName: string, channel: string, message: string) => {
         client.publish(`${channel}/rpc`, message);
-        logger.info(`[server]: Client ${clientName} published message "${message}" to channel "${channel}"`);
+        logger.request(`[server]: Client ${clientName} published message "${message}" to channel "${channel}"`);
     },
     status: (device: Device) => {
         if(!device || !device.room_id) {
@@ -173,20 +173,21 @@ export const mqtt = {
         const room: Room = roomList.data.rooms[roomKey];
         const mqttConfig = createMqttConfig(device.name, room);
 
-        client.publish(`${mqttConfig.topic_prefix}/rpc`, JSON.stringify({...STATUS_MESSAGE, id: device.ip}));
-        logger.info(`[server]: Client ${device.name} published [get status] to channel "${mqttConfig.topic_prefix}"`);
+        client.publish(`${mqttConfig.topic_prefix}/rpc`, JSON.stringify({ src: `${getSiteConfigCached().name}.status`, ...STATUS_MESSAGE, id: device.ip }));
+        logger.request(`[server]: Client ${device.name} published [get status] to channel "${mqttConfig.topic_prefix}"`);
     },
 };
 
 export const createMqttConfig = (deviceName: string, deviceRoom: Room): MqttResult => {
+    const siteConfig = getSiteConfigCached();
     const name = deviceName.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
     const room = deviceRoom ? deviceRoom.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase() : "default";
 
     return {
         enable: true,
-        server: site.buffington.mqtt,
+        server: siteConfig.mqtt,
         client_id: name,
-        topic_prefix: `${site.buffington.name}/${room}/${name}/switch`,
+        topic_prefix: `${siteConfig.name}/${room}/${name}/switch`,
         enable_rpc: true,
         enable_control: true,
         user: undefined,

@@ -1,20 +1,4 @@
 services:
-  mqtt:
-    image: eclipse-mosquitto:2
-    container_name: mqtt
-    ports:
-      - "1884:1883"
-      - "9002:9001"
-    volumes:
-      - mosquitto_data:/mosquitto/data
-      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t healthcheck -m ok || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   postgres:
     image: postgres:15
     container_name: postgres
@@ -80,10 +64,9 @@ services:
       CLIENT_URL: "$CLIENT_URL"
       SHELLY_CLOUD_AUTH_KEY: "$SHELLY_CLOUD_AUTH_KEY"
       VHOST_PREFIX: "$VHOST_PREFIX"
+      LOG_MODE: "${LOG_MODE:-normal}"
       DATABASE_URL: "postgres://shelly-user:${DB_PASSWORD}@postgres:5432/shelly_db"
     depends_on:
-      mqtt:
-        condition: service_healthy
       postgres:
         condition: service_healthy
       loki:
@@ -119,6 +102,5 @@ services:
       - "4501:4501"
 
 volumes:
-  mosquitto_data:
   postgres_data:
   loki_data:

@@ -89,6 +89,11 @@ export const composeShellyDevice = async (
             return null;
         }
         const deviceInList = devices.data.devices[device.sys.mac.toLocaleLowerCase()];
+        const enrichedDevice = {
+            ...deviceInList,
+            ip: device.wifi?.sta_ip || ip,
+            ssid: device.wifi?.ssid || deviceInList.ssid,
+        };
         response = {
             ip: ip,
             name: deviceInList.name,
@@ -97,7 +102,7 @@ export const composeShellyDevice = async (
             mqtt: createMqttConfig(deviceInList.name, rooms.data.rooms[deviceInList.room_id]),
             room: deviceInList.room_id ? rooms.data.rooms[deviceInList.room_id] : null,
             switchStatus: device["switch:0"],
-            device: deviceInList,
+            device: enrichedDevice,
         }
         logger.info(`[server]: Discovered device at ${ip}: ${JSON.stringify(response.name)}`);
         discoverSuccess();
@@ -112,9 +117,22 @@ export const composeShellyDevice = async (
 };
 
 
-export const shellyActivateMqtt = async (ip: string, device: any): Promise<IDevice | null> => {
+export interface MqttActivateOverrides {
+    server?: string;
+    topicPrefix?: string;
+}
+
+export const shellyActivateMqtt = async (ip: string, device: any, overrides: MqttActivateOverrides = {}): Promise<IDevice | null> => {
     logger.info(`[server]: Activating MQTT for device with IP: ${ip}`, device);
     const mqttConfig: MqttResult = createMqttConfig(device.name, device.room);
+
+    if (overrides.server) {
+        mqttConfig.server = overrides.server;
+    }
+    if (overrides.topicPrefix) {
+        mqttConfig.topic_prefix = overrides.topicPrefix;
+    }
+
     const options = {
         body: {
             id: 0,

@@ -1,18 +1,7 @@
 {
   "scripts": {
 
-    "build-mqtt": "docker build -t shelly-host-mqtt:latest mqtt",
-    "build-common": "docker build -t shelly-host-common:latest common",
-    "build-client": "docker build -f client/Dockerfile -t shelly-host-client .",
-    "build-server": "docker build -t shelly-host-server:latest server",
-    
-
-    "deploy-mqtt": "npm run build-mqtt && docker tag shelly-host-mqtt:latest registry.caldane.net/shelly-host-mqtt:latest && docker push registry.caldane.net/shelly-host-mqtt:latest",
-    "deploy-common": "npm run build-common && docker tag shelly-host-common:latest registry.caldane.net/shelly-host-common:latest && docker push registry.caldane.net/shelly-host-common:latest",
-    "deploy-client": "npm run build-client && docker tag shelly-host-client:latest registry.caldane.net/shelly-host-client:latest && docker push registry.caldane.net/shelly-host-client:latest",
-    "deploy-server": "npm run build-server && docker tag shelly-host-server:latest registry.caldane.net/shelly-host-server:latest && docker push registry.caldane.net/shelly-host-server:latest",
-    
-    "build": "npm run build-mqtt && npm run build-common && npm run build-client && npm run build-server",
-    "deploy": "npm run deploy-mqtt && npm run deploy-common && npm run deploy-client && npm run deploy-server"
+    "dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "dev:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down"
   }
 }

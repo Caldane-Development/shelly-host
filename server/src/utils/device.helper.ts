@@ -28,7 +28,7 @@ export const createIDevice = (device: Device): IDevice => {
     } as IDevice;
 };
 
-const toDeviceRow = (device: Device) => ({
+const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"]) => ({
     id: device.id.toString(),
     type: device.type,
     category: device.category,
@@ -45,12 +45,15 @@ const toDeviceRow = (device: Device) => ({
     modified: new Date((device.modified || 0) * 1000),
     ip: device.ip,
     ssid: device.ssid,
+    mqttEnable: Boolean(mqtt?.enable),
+    mqttServer: mqtt?.server || "",
+    mqttTopic: mqtt?.topic_prefix || "",
 });
 
 export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void> => {
     const rows = discovered
         .filter((d) => d?.device && d.device.id !== undefined && d.device.id !== null)
-        .map((d) => toDeviceRow(d.device));
+        .map((d) => toDeviceRow(d.device, d.mqtt));
 
     if (rows.length === 0) {
         return;
@@ -78,6 +81,9 @@ export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void
                     modified: sql`excluded.modified`,
                     ip: sql`excluded.ip`,
                     ssid: sql`excluded.ssid`,
+                    mqttEnable: sql`excluded.mqtt_enable`,
+                    mqttServer: sql`excluded.mqtt_server`,
+                    mqttTopic: sql`excluded.mqtt_topic`,
                 },
             });
         logger.info(`[server]: Saved ${rows.length} discovered device(s) to the database`);
@@ -88,4 +94,61 @@ export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void
 
 export const getStoredDevices = async () => {
     return db.select().from(devicesTable);
+};
+
+type StoredDeviceRow = Awaited<ReturnType<typeof getStoredDevices>>[number];
+
+// Map a persisted (camelCase, drizzle) row back to the device-list Device shape
+// so it can be enriched into a full IDevice.
+const toDevice = (row: StoredDeviceRow): Device => ({
+    id: row.id,
+    type: row.type,
+    category: row.category,
+    position: row.position,
+    gen: row.gen,
+    channel: row.channel,
+    channels_count: row.channelsCount,
+    mode: row.mode,
+    name: row.name,
+    room_id: row.roomId,
+    image: row.image,
+    cloud_options: row.cloudOptions as Device["cloud_options"],
+    cloud_online: row.cloudOnline,
+    modified: row.modified ? Math.floor(row.modified.getTime() / 1000) : 0,
+    ip: row.ip,
+    ssid: row.ssid,
+});
+
+// Return stored devices enriched into full IDevice objects (with MQTT config and
+// room details) so the client can render interactive Shelly cards.
+export const getStoredIDevices = async (): Promise<IDevice[]> => {
+    const rows = await getStoredDevices();
+
+    // createMqttConfig fabricates enable/connected=true. Override with the real
+    // MQTT state that was persisted during the last scan so cards reflect the
+    // actual connection status.
+    return rows.map((row) => {
+        const device = createIDevice(toDevice(row));
+        const enable = Boolean(row.mqttEnable);
+        return {
+            ...device,
+            mqtt: {
+                ...device.mqtt,
+                enable,
+                connected: enable,
+                // Only expose a broker when MQTT is actually configured; the
+                // fabricated default from createMqttConfig would otherwise make
+                // unconfigured devices look connected.
+                server: enable ? row.mqttServer || device.mqtt.server : "",
+                topic_prefix: enable ? row.mqttTopic || device.mqtt.topic_prefix : "",
+            },
+        };
+    });
+};
+
+// Return the raw Device records for stored devices that have MQTT enabled, so
+// their live switch status can be requested over MQTT.
+export const getEnabledDevices = async (): Promise<Device[]> => {
+    const rows = await getStoredDevices();
+    return rows.filter((row) => row.mqttEnable).map(toDevice);
 };

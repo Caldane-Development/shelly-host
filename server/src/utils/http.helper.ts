@@ -81,10 +81,10 @@ async function getRequest<T>(
 
   try {
     const response = await makeRequest<T>(options, null, retries, delay);
-    console.log('GET response:', response);
+    logger.debug(`GET response: ${JSON.stringify(response)}`);
     return response;
   } catch (error) {
-    console.error('GET request failed:', error);
+    logger.debug(`GET request failed: ${error}`);
     throw error;
   }
 }
@@ -113,12 +113,12 @@ async function postRequest<T>(
   headers['Content-Length'] = Buffer.byteLength(body); 
 
   try {
-    logger.info(`POST request to ${url} with body: ${body} `);
+    logger.debug(`POST request to ${url} with body: ${body} `);
     const response = await makeRequest<T>(options, body, retries, delay);
-    console.log('POST response:', response);
+    logger.debug(`POST response: ${JSON.stringify(response)}`);
     return response;
   } catch (error) {
-    console.error('POST request failed:', error);
+    logger.debug(`POST request failed: ${error}`);
     throw error;
   }
 }

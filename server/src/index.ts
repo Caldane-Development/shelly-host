@@ -6,6 +6,7 @@ import { logEnv, logger } from "./logger";
 
 import { init } from "./utils/server.helper";
 import { ensureSchema } from "./db/client";
+import { loadSiteConfig } from "./utils/site-config.helper";
 
 
 
@@ -13,18 +14,28 @@ logger.info(`[server]: Environment: ${process.env.NODE_ENV}`, { PORT: process.en
 
 ensureSchema()
     .then(() => logger.info("[server]: Database schema ensured"))
+    .then(() => loadSiteConfig())
+    .then((config) => logger.info(`[server]: Site config loaded (site: ${config.name})`))
     .catch((error) => logger.error(`[server]: Failed to ensure database schema: ${error}`));
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
-init(app);
 
 app.use(
     expressWinston.logger({
         winstonInstance: logger,
-        statusLevels: true,
+        statusLevels: false,
+        level: (req, res) => {
+            if (res.statusCode >= 500) return "error";
+            if (res.statusCode >= 400) return "warn";
+            // Health checks fire constantly; only surface them in verbose mode.
+            if (req.url === "/health") return "debug";
+            return "request";
+        },
     })
 );
+
+init(app);
 
 app.get("/", (_: Request, res: Response) => {
     logEnv();

@@ -1,6 +1,13 @@
 # Development override for hot reload.
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d client
 services:
+  # Don't stream loki & grafana output to the terminal during local dev.
+  # attach:false stops `compose up` from tailing them; they still run normally.
+  loki:
+    attach: false
+  grafana:
+    attach: false
+
   client:
     build:
       context: .

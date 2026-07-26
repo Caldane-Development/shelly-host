@@ -5,6 +5,8 @@ import { messageRouter } from "../routers/message.router";
 import { shellyRouter } from "../routers/shelly.router";
 import { siteRouter } from "../routers/site.router";
 import { wifiRouter } from "../routers/wifi.router";
+import { mqttBrokerRouter } from "../routers/mqtt-broker.router";
+import { siteConfigRouter } from "../routers/site-config.router";
 
 const init = (app: Express) => {
     logger.info(`Add middleware for json parser.`);
@@ -23,6 +25,8 @@ const init = (app: Express) => {
     app.use(`${process.env.VHOST_PREFIX}/shelly`, shellyRouter);
     app.use(`${process.env.VHOST_PREFIX}/site`, siteRouter);
     app.use(`${process.env.VHOST_PREFIX}/wifi`, wifiRouter);
+    app.use(`${process.env.VHOST_PREFIX}/mqtt-broker`, mqttBrokerRouter);
+    app.use(`${process.env.VHOST_PREFIX}/site-config`, siteConfigRouter);
 
 };
 
