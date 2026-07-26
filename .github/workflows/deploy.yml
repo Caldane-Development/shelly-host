@@ -15,18 +15,19 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REGISTRY: registry.caldane.net
-  SERVER_IMAGE: registry.caldane.net/shelly-host-server
-  CLIENT_IMAGE: registry.caldane.net/shelly-host-client
+  # Local registry running on the prod host (same pattern as
+  # Soonercon/programming-survey). Push via the host's LAN address, pull via
+  # localhost -- both point at the same registry:2 on the box, so no public
+  # network hop and no registry credentials are needed.
+  PUSH_REGISTRY: 10.10.10.28:5000
+  SERVER_IMAGE: 10.10.10.28:5000/shelly-host-server
+  CLIENT_IMAGE: 10.10.10.28:5000/shelly-host-client
 
 jobs:
   deploy:
     name: Build, push & deploy
     # The self-hosted runner lives on the production host, so it builds, pushes
-    # to registry.caldane.net, and brings the stack up locally (same pattern as
-    # Soonercon/programming-survey). Docker on the host must already be
-    # authenticated to the registry (`docker login registry.caldane.net` once);
-    # no registry credentials are stored in GitHub.
+    # to the local registry, and brings the stack up locally.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: [self-hosted, Linux, X64]
     steps:

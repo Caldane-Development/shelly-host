@@ -1,7 +1,11 @@
 # Production overlay.
 #
-# Pulls prebuilt images from the registry instead of building from source, so
-# the production host only needs the compose files + a .env (not the full repo).
+# Pulls prebuilt images from the local registry (registry:2 on the prod host)
+# instead of building from source, so the production host only needs the compose
+# files + a .env (not the full repo).
+#
+# Images are pushed by CI to 10.10.10.28:5000 and pulled here via localhost:5000
+# (same registry, resolved locally on the host).
 #
 # Usage on the production host:
 #   IMAGE_TAG=<git-sha> \
@@ -12,9 +16,9 @@
 # short commit SHA so each release is pinned to an immutable image.
 services:
   server:
-    image: registry.caldane.net/shelly-host-server:${IMAGE_TAG:-latest}
+    image: localhost:5000/shelly-host-server:${IMAGE_TAG:-latest}
     pull_policy: always
 
   client:
-    image: registry.caldane.net/shelly-host-client:${IMAGE_TAG:-latest}
+    image: localhost:5000/shelly-host-client:${IMAGE_TAG:-latest}
     pull_policy: always
