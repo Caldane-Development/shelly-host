@@ -1,12 +1,22 @@
 # Development override for hot reload.
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d client
 services:
+  # Publish the internal services to the host for local development only.
+  # Production keeps these internal-only (see docker-compose.yml).
+  postgres:
+    ports:
+      - "5432:5432"
+
   # Don't stream loki & grafana output to the terminal during local dev.
   # attach:false stops `compose up` from tailing them; they still run normally.
   loki:
     attach: false
+    ports:
+      - "3100:3100"
   grafana:
     attach: false
+    ports:
+      - "3000:3000"
 
   client:
     build:

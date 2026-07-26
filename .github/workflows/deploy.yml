@@ -67,7 +67,7 @@ jobs:
         # the stack itself runs under the github-runner account on the prod host
         # (same box, 10.10.10.28). Deploy over SSH like Soonercon/programming-
         # survey: copy the compose files, then pull from localhost:5000 and bring
-        # the stack up. The runtime .env lives in DEPLOY_PATH on the host.
+        # the stack up. Runtime config is injected from GitHub vars/secrets.
         env:
           IMAGE_TAG: ${{ steps.meta.outputs.tag }}
           DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
@@ -79,10 +79,22 @@ jobs:
           $SSH "mkdir -p '$DEPLOY_PATH'"
           $SCP docker-compose.yml docker-compose.prod.yml "github-runner@10.10.10.28:$DEPLOY_PATH/"
 
-          $SSH "IMAGE_TAG='$IMAGE_TAG' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'EOF'
+          $SSH "IMAGE_TAG='$IMAGE_TAG' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<EOF
             set -euo pipefail
-            cd "$DEPLOY_PATH"
+            cd "\$DEPLOY_PATH"
             export IMAGE_TAG
+
+            # Runtime configuration (injected from GitHub vars/secrets).
+            export PORT="${{ vars.PORT }}"
+            export VHOST_PREFIX="${{ vars.VHOST_PREFIX }}"
+            export CLIENT_URL="${{ vars.CLIENT_URL }}"
+            export VITE_APP_BACKEND="${{ vars.VITE_APP_BACKEND }}"
+            export VITE_APP_NAME="${{ vars.VITE_APP_NAME }}"
+            export LOG_MODE="${{ vars.LOG_MODE }}"
+            export MQTT_URL="${{ secrets.MQTT_URL }}"
+            export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+            export SHELLY_CLOUD_AUTH_KEY="${{ secrets.SHELLY_CLOUD_AUTH_KEY }}"
+
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
             docker image prune -f

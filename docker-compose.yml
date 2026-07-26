@@ -6,8 +6,9 @@ services:
       POSTGRES_USER: shelly-user
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: shelly_db
-    ports:
-      - "5432:5432"
+    # Host port publishing lives in docker-compose.dev.yml so production keeps
+    # the database internal-only (avoids clashing with other services on the
+    # prod host). Containers still reach it over the compose network.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -21,8 +22,7 @@ services:
   loki:
     image: grafana/loki:2.9.2
     container_name: loki
-    ports:
-      - "3100:3100"
+    # Host port published only in dev (see docker-compose.dev.yml).
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - loki_data:/loki
@@ -36,8 +36,7 @@ services:
   grafana:
     image: grafana/grafana:10.2.3
     container_name: grafana
-    ports:
-      - "3000:3000"
+    # Host port published only in dev (see docker-compose.dev.yml).
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     restart: unless-stopped
