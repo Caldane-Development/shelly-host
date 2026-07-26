@@ -63,19 +63,28 @@ jobs:
           docker push "$CLIENT_IMAGE:${{ steps.meta.outputs.tag }}"
 
       - name: Deploy stack
-        # PROD_DEPLOY_PATH holds the production compose files + runtime .env on
-        # the host. Copy the repo's compose files there, then bring the stack up
-        # with the freshly built, tagged images.
+        # The runner user (github) can build & push to the local registry, but
+        # the stack itself runs under the github-runner account on the prod host
+        # (same box, 10.10.10.28). Deploy over SSH like Soonercon/programming-
+        # survey: copy the compose files, then pull from localhost:5000 and bring
+        # the stack up. The runtime .env lives in DEPLOY_PATH on the host.
         env:
           IMAGE_TAG: ${{ steps.meta.outputs.tag }}
           DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
         run: |
           set -euo pipefail
-          mkdir -p "$DEPLOY_PATH"
-          cp docker-compose.yml docker-compose.prod.yml "$DEPLOY_PATH"/
-          cd "$DEPLOY_PATH"
-          export IMAGE_TAG
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
-          docker image prune -f
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+          SSH="ssh -i ~/.ssh/github_runner_key -o StrictHostKeyChecking=no github-runner@10.10.10.28"
+          SCP="scp -i ~/.ssh/github_runner_key -o StrictHostKeyChecking=no"
+
+          $SSH "mkdir -p '$DEPLOY_PATH'"
+          $SCP docker-compose.yml docker-compose.prod.yml "github-runner@10.10.10.28:$DEPLOY_PATH/"
+
+          $SSH "IMAGE_TAG='$IMAGE_TAG' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'EOF'
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+            export IMAGE_TAG
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+          EOF
