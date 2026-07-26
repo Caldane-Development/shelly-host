@@ -104,3 +104,15 @@ services:
 volumes:
   postgres_data:
   loki_data:
+
+# Pin the project's default network to a subnet that cannot collide with the
+# real LANs this stack talks to. The prod host has exhausted Docker's default
+# 172.16.0.0/12 pool, so a new network would otherwise be handed 192.168.0.0/20,
+# which swallows the real 192.168.1.0/24 (MQTT broker + Shelly devices) and
+# black-holes all traffic to it. 10.89.0.0/24 avoids the prod LAN (10.10.10.0/24),
+# the homelab LAN (192.168.1.0/24), and Docker's 172.x range.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
