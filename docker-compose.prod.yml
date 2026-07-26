@@ -25,3 +25,21 @@ services:
     # The runtime (nginx) image doesn't need a TTY; leaving it on can keep an
     # SSH-driven `compose up -d` session open during deploy.
     tty: false
+
+  # nginx "front door": the single published web entry point in production.
+  # Publishes host port 4501 (the same port the OpenResty reverse proxy already
+  # targets, so no OpenResty change is needed) and routes /api/* to the backend
+  # server while serving the SPA from the client container.
+  proxy:
+    image: localhost:5000/shelly-host-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    container_name: shelly-proxy
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+      client:
+        condition: service_started
+    ports:
+      - "4501:80"
+

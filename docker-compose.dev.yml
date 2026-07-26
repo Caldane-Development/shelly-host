@@ -32,3 +32,7 @@ services:
       - ./common:/app/common
       - /app/client/node_modules
     command: ["npm", "run", "dev"]
+    # Dev accesses the client directly on the host; production fronts it with
+    # the nginx proxy instead (see docker-compose.prod.yml).
+    ports:
+      - "4501:4501"

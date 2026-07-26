@@ -97,8 +97,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
     tty: true
-    ports:
-      - "4501:4501"
+    # Host port published only in dev (see docker-compose.dev.yml). In
+    # production the nginx front door (docker-compose.prod.yml) publishes the
+    # web port and proxies to this container internally.
 
 volumes:
   postgres_data:

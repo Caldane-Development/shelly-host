@@ -22,6 +22,7 @@ env:
   PUSH_REGISTRY: 10.10.10.28:5000
   SERVER_IMAGE: 10.10.10.28:5000/shelly-host-server
   CLIENT_IMAGE: 10.10.10.28:5000/shelly-host-client
+  PROXY_IMAGE: 10.10.10.28:5000/shelly-host-proxy
 
 jobs:
   deploy:
@@ -61,6 +62,15 @@ jobs:
             -f client/Dockerfile .
           docker push "$CLIENT_IMAGE:latest"
           docker push "$CLIENT_IMAGE:${{ steps.meta.outputs.tag }}"
+
+      - name: Build & push proxy image
+        run: |
+          docker build \
+            -t "$PROXY_IMAGE:latest" \
+            -t "$PROXY_IMAGE:${{ steps.meta.outputs.tag }}" \
+            -f proxy/Dockerfile .
+          docker push "$PROXY_IMAGE:latest"
+          docker push "$PROXY_IMAGE:${{ steps.meta.outputs.tag }}"
 
       - name: Deploy stack
         # The runner user (github) can build & push to the local registry, but
