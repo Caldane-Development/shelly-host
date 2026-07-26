@@ -102,6 +102,8 @@ jobs:
             # to a file (then cat'ing it) lets SSH close cleanly.
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans </dev/null >up.log 2>&1 || { cat up.log; exit 1; }
             cat up.log
-            docker image prune -f
+            # Best-effort cleanup; don't fail the deploy if a prune is already
+            # running (e.g. a concurrent/previous run) or nothing to prune.
+            docker image prune -f || true
             docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
           EOF
