@@ -132,3 +132,5 @@ dist
 
 # config
 site.json
+# ...but track the server's catalog/fallback copy (contains no secrets).
+!server/src/assets/json/site.json

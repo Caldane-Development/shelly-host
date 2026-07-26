@@ -1,0 +1,89 @@
+{
+    "buffington": {
+        "name": "buffington",
+        "description": "The location on Buffington",
+        "mqtt": "",
+        "webhook": "",
+        "address": {
+            "street": "",
+            "city": "",
+            "state": "",
+            "zip": ""
+        },
+        "rooms": {
+            "living-room": {
+                "name": "living-room",
+                "description": "The main living area",
+                "switches": [
+                    {
+                        "name": "lights",
+                        "description": "The main lights in the living room",
+                        "type": "toggle",
+                        "state": false,
+                        "channel": 0
+                    },
+                    {
+                        "name": "fan",
+                        "description": "The ceiling fan in the living room",
+                        "type": "toggle",
+                        "state": false,
+                        "channel": 0
+                    }
+                ]
+            },
+            "dining-room": {
+                "name": "dining-room",
+                "description": "The dining area",
+                "switches": [
+                    {
+                        "name": "lights",
+                        "description": "The main lights in the dining room",
+                        "type": "toggle",
+                        "state": false,
+                        "channel": 0
+                    },
+                    {
+                        "name": "chandelier",
+                        "description": "The chandelier in the dining room",
+                        "type": "toggle",
+                        "state": false,
+                        "channel": 0
+                    }
+                ]
+            },
+            "kitchen": {
+                "name": "kitchen",
+                "description": "The kitchen area",
+                "switches": [
+                    {
+                        "name": "lights",
+                        "description": "The main lights in the kitchen",
+                        "type": "toggle",
+                        "state": false,
+                        "channel": 0
+                    }
+                ]
+            },
+            "master-bedroom": {
+                "name": "master-bedroom",
+                "description": "The main bedroom",
+                "switches": [
+                    {
+                        "name": "fan",
+                        "description": "The ceiling fan in the living room",
+                        "type": "toggle",
+                        "state": false,
+                        "channel": 0
+                    },
+                    {
+                        "name": "lights",
+                        "description": "The main lights in the living room",
+                        "type": "toggle",
+                        "state": false,
+                        "channel": 0
+                    }
+                ]
+            }
+        }
+    }
+}
