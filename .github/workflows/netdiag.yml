@@ -1,0 +1,25 @@
+name: NetDiag
+
+# Temporary one-off diagnostic run ON the prod host (self-hosted runner lives on
+# 10.10.10.28). Used to inspect Docker networks / routing for a 192.168.1.0/24
+# overlap. Safe: read-only, no changes. Delete after use.
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Network + docker inspection
+        run: |
+          echo "=== host ==="; hostname; ip -4 addr show | grep -E "inet " | grep -v 127.0.0.1
+          echo "=== docker networks (subnets) ==="
+          for n in $(docker network ls -q); do
+            docker network inspect "$n" --format '{{.Name}} [{{.Driver}}]: {{range .IPAM.Config}}{{.Subnet}} {{end}}'
+          done
+          echo "=== host routes ==="; ip route
+          echo "=== route lookup 192.168.1.15 (perceptor) ==="; ip route get 192.168.1.15 || true
+          echo "=== reach perceptor:9001 (agent) ==="; timeout 3 bash -c 'echo >/dev/tcp/192.168.1.15/9001' 2>/dev/null && echo OPEN || echo UNREACHABLE
+          echo "=== ping perceptor ==="; ping -c1 -W2 192.168.1.15 >/dev/null 2>&1 && echo OK || echo FAIL
+          echo "=== ping a shelly-range host 192.168.1.1 (gw) ==="; ping -c1 -W2 192.168.1.1 >/dev/null 2>&1 && echo OK || echo FAIL
+          echo "=== docker-managed iptables NAT (192.168) ==="; sudo iptables -t nat -S 2>/dev/null | grep -E "192\.168\.1" || echo "(none / no sudo)"
