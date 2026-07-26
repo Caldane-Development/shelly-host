@@ -13,6 +13,7 @@ export interface SiteConfig {
     city: string;
     state: string;
     zip: string;
+    cloudAuthKey: string;
 }
 
 // Fallback used before the DB cache is hydrated (and if the DB read fails).
@@ -25,6 +26,7 @@ const fallback: SiteConfig = {
     city: site.buffington.address?.city ?? "",
     state: site.buffington.address?.state ?? "",
     zip: site.buffington.address?.zip ?? "",
+    cloudAuthKey: process.env.SHELLY_CLOUD_AUTH_KEY ?? "",
 };
 
 // In-memory cache so callers that build MQTT topics (createMqttConfig) can read
@@ -40,6 +42,7 @@ const rowToConfig = (row: typeof siteConfig.$inferSelect): SiteConfig => ({
     city: row.city ?? "",
     state: row.state ?? "",
     zip: row.zip ?? "",
+    cloudAuthKey: row.cloudAuthKey ?? "",
 });
 
 // Synchronous accessor backed by the in-memory cache.
@@ -78,6 +81,7 @@ export const saveSiteConfig = async (update: Partial<SiteConfig>): Promise<SiteC
                 city: merged.city,
                 state: merged.state,
                 zip: merged.zip,
+                cloudAuthKey: merged.cloudAuthKey,
                 modified: new Date(),
             },
         })

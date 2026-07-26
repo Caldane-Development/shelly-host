@@ -79,8 +79,13 @@ export const ensureSchema = async (): Promise<void> => {
             city text DEFAULT '',
             state text DEFAULT '',
             zip text DEFAULT '',
+            cloud_auth_key text DEFAULT '',
             modified timestamp NOT NULL DEFAULT now()
         );
+    `;
+    // Add cloud_auth_key to pre-existing site_config tables.
+    await queryClient`
+        ALTER TABLE site_config ADD COLUMN IF NOT EXISTS cloud_auth_key text DEFAULT '';
     `;
     // Seed the single site_config row (id=1) from site.json on first run only.
     const buffington = site.buffington;
@@ -99,5 +104,43 @@ export const ensureSchema = async (): Promise<void> => {
             now()
         )
         ON CONFLICT (id) DO NOTHING;
+    `;
+    // One-time migration: seed the cloud auth key from the legacy env var if the
+    // DB column is still empty. Lets us drop SHELLY_CLOUD_AUTH_KEY from the env
+    // once it lives in the database.
+    if (process.env.SHELLY_CLOUD_AUTH_KEY) {
+        await queryClient`
+            UPDATE site_config
+            SET cloud_auth_key = ${process.env.SHELLY_CLOUD_AUTH_KEY}
+            WHERE id = 1 AND (cloud_auth_key IS NULL OR cloud_auth_key = '');
+        `;
+    }
+    await queryClient`
+        CREATE TABLE IF NOT EXISTS switch_groups (
+            id serial PRIMARY KEY,
+            name text NOT NULL,
+            room_id integer,
+            controller_device_id text,
+            tie_break text NOT NULL DEFAULT 'on',
+            modified timestamp NOT NULL DEFAULT now()
+        );
+    `;
+    await queryClient`
+        CREATE TABLE IF NOT EXISTS switch_group_members (
+            id serial PRIMARY KEY,
+            group_id integer NOT NULL,
+            device_id text NOT NULL,
+            channel integer NOT NULL DEFAULT 0
+        );
+    `;
+    await queryClient`
+        CREATE TABLE IF NOT EXISTS switch_bridges (
+            id serial PRIMARY KEY,
+            controller_device_id text NOT NULL,
+            controller_channel integer NOT NULL DEFAULT 0,
+            target_device_id text NOT NULL,
+            target_channel integer NOT NULL DEFAULT 0,
+            modified timestamp NOT NULL DEFAULT now()
+        );
     `;
 };

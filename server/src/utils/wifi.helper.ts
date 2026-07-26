@@ -6,6 +6,11 @@ export const getWifiCredentials = async () => {
     return db.select().from(wifiCredentials).orderBy(wifiCredentials.ssid);
 };
 
+export const getWifiCredentialBySsid = async (ssid: string) => {
+    const [row] = await db.select().from(wifiCredentials).where(eq(wifiCredentials.ssid, ssid));
+    return row ?? null;
+};
+
 export const getAvailableSsids = async (): Promise<string[]> => {
     const rows = await db
         .selectDistinct({ ssid: devices.ssid })

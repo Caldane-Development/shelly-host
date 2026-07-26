@@ -92,6 +92,22 @@ button.enable-mqtt {
     font-size: 0.85rem;
 }
 
+button.change-wifi {
+    background: #0ea5e9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.dialog-note {
+    font-size: 0.8rem;
+    color: #cbd5e1;
+    margin: 0;
+    line-height: 1.4;
+}
+
 .dialog-overlay {
     position: fixed;
     inset: 0;

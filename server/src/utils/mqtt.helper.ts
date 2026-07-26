@@ -7,6 +7,7 @@ import { MqttResult } from "../../../common/models/mqtt.interface";
 import { Device, IDevice } from "../../../common/models/device.interface";
 import { createIDevice } from "./device.helper";
 import { getSiteConfigCached } from "./site-config.helper";
+import { resolveBridgeTargets } from "./bridge.helper";
 
 export interface SubscriptionResponse {
     id: string;
@@ -83,6 +84,43 @@ client.on("message", (topic, message) => {
                 logger.error(`[server]: Failed to forward MQTT message to monitor: ${error}`);
             }
         });
+    }
+
+    // Switch-bridge handling: a controller device's NotifyStatus is mirrored
+    // onto its linked target device(s) over MQTT (replaces outgoing webhooks).
+    // Topics look like "{prefix}/events/rpc" and carry the source device id.
+    if (topic.endsWith("/events/rpc") && message.length > 0) {
+        try {
+            const frame = JSON.parse(message.toString());
+            if (frame.method === "NotifyStatus" && frame.src && frame.params) {
+                for (const key of Object.keys(frame.params)) {
+                    const match = key.match(/^switch:(\d+)$/);
+                    if (!match) {
+                        continue;
+                    }
+                    const output = frame.params[key]?.output;
+                    if (typeof output !== "boolean") {
+                        continue;
+                    }
+                    const channel = Number(match[1]);
+                    const targets = resolveBridgeTargets(frame.src, channel, output);
+                    targets.forEach((target) => {
+                        const command = JSON.stringify({
+                            id: 0,
+                            src: `${getSiteConfigCached().name}.bridge`,
+                            method: "Switch.Set",
+                            params: { id: target.channel, on: target.on },
+                        });
+                        client.publish(`${target.topicPrefix}/rpc`, command);
+                        logger.request(
+                            `[server]: Bridge mirrored ${frame.src} switch:${channel}=${output} -> ${target.targetName} (${target.topicPrefix})`
+                        );
+                    });
+                }
+            }
+        } catch (error) {
+            logger.error(`[server]: Failed to process bridge event: ${error}`);
+        }
     }
 
     const [topicSite, topicChannel] = topic.split(".");

@@ -1,0 +1,20 @@
+# Production overlay.
+#
+# Pulls prebuilt images from the registry instead of building from source, so
+# the production host only needs the compose files + a .env (not the full repo).
+#
+# Usage on the production host:
+#   IMAGE_TAG=<git-sha> \
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+#
+# IMAGE_TAG defaults to "latest" when unset. The deploy workflow sets it to the
+# short commit SHA so each release is pinned to an immutable image.
+services:
+  server:
+    image: registry.caldane.net/shelly-host-server:${IMAGE_TAG:-latest}
+    pull_policy: always
+
+  client:
+    image: registry.caldane.net/shelly-host-client:${IMAGE_TAG:-latest}
+    pull_policy: always

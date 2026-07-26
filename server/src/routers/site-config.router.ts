@@ -5,10 +5,19 @@ import site from "../assets/json/site.json";
 
 export const siteConfigRouter = Router();
 
+// Never expose the raw cloud auth key over the API. Return a masked hint so the
+// UI can show whether it is set without leaking the secret.
+const maskCloudAuthKey = (key: string): string => {
+    if (!key) {
+        return "";
+    }
+    return key.length <= 4 ? "****" : `****${key.slice(-4)}`;
+};
+
 siteConfigRouter.get("/", async (_req: Request, res: Response) => {
     try {
         const config = await getSiteConfig();
-        res.json(config);
+        res.json({ ...config, cloudAuthKey: maskCloudAuthKey(config.cloudAuthKey) });
     } catch (error) {
         logger.error(`[site-config]: Failed to fetch site config: ${error}`);
         res.status(500).json({ error: "Failed to fetch site config" });
@@ -16,7 +25,7 @@ siteConfigRouter.get("/", async (_req: Request, res: Response) => {
 });
 
 siteConfigRouter.put("/", async (req: Request, res: Response) => {
-    const { name, description, mqtt, webhook, street, city, state, zip } = req.body ?? {};
+    const { name, description, mqtt, webhook, street, city, state, zip, cloudAuthKey } = req.body ?? {};
 
     if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
         res.status(400).json({ error: "name must be a non-empty string" });
@@ -33,8 +42,9 @@ siteConfigRouter.put("/", async (req: Request, res: Response) => {
             ...(city !== undefined ? { city } : {}),
             ...(state !== undefined ? { state } : {}),
             ...(zip !== undefined ? { zip } : {}),
+            ...(cloudAuthKey !== undefined ? { cloudAuthKey } : {}),
         });
-        res.json(saved);
+        res.json({ ...saved, cloudAuthKey: maskCloudAuthKey(saved.cloudAuthKey) });
     } catch (error) {
         logger.error(`[site-config]: Failed to save site config: ${error}`);
         res.status(500).json({ error: "Failed to save site config" });

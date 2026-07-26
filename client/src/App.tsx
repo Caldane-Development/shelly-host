@@ -8,6 +8,7 @@ import SiteConfigs from "./components/site-configs/SiteConfigs";
 import MqttBrowser from "./components/mqtt-browser/MqttBrowser";
 import Devices from "./components/devices/Devices";
 import Rooms from "./components/rooms/Rooms";
+import Groups from "./components/groups/Groups";
 
 function App() {
     return (
@@ -26,6 +27,7 @@ function App() {
                 <Route path="/site-configs" element={<SiteConfigs />} />
                 <Route path="/devices" element={<Devices />} />
                 <Route path="/rooms" element={<Rooms />} />
+                <Route path="/groups" element={<Groups />} />
                 <Route path="/mqtt-browser" element={<MqttBrowser />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

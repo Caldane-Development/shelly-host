@@ -69,5 +69,37 @@ export const siteConfig = pgTable('site_config', {
   city: text('city').default(''),
   state: text('state').default(''),
   zip: text('zip').default(''),
+  cloudAuthKey: text('cloud_auth_key').default(''),
+  modified: timestamp('modified', { mode: 'date' }).notNull().defaultNow(),
+});
+
+// A logical switch that controls multiple devices with "smart" majority logic:
+// when triggered, all members are set to the opposite of the majority state.
+export const switchGroups = pgTable('switch_groups', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  roomId: integer('room_id'),                       // optional room this group seeds from
+  controllerDeviceId: text('controller_device_id'), // optional physical device that triggers it
+  tieBreak: text('tie_break').notNull().default('on'), // 'on' | 'off' when members split evenly
+  modified: timestamp('modified', { mode: 'date' }).notNull().defaultNow(),
+});
+
+export const switchGroupMembers = pgTable('switch_group_members', {
+  id: serial('id').primaryKey(),
+  groupId: integer('group_id').notNull(),
+  deviceId: text('device_id').notNull(),
+  channel: integer('channel').notNull().default(0),
+});
+
+// A one-way controller -> target link driven over MQTT. When the controller
+// device publishes a switch state change (NotifyStatus), the server sets the
+// target device to the same state. Replaces the old outgoing-webhook approach
+// and needs no static IPs (commands go to the target's MQTT topic).
+export const switchBridges = pgTable('switch_bridges', {
+  id: serial('id').primaryKey(),
+  controllerDeviceId: text('controller_device_id').notNull(),
+  controllerChannel: integer('controller_channel').notNull().default(0),
+  targetDeviceId: text('target_device_id').notNull(),
+  targetChannel: integer('target_channel').notNull().default(0),
   modified: timestamp('modified', { mode: 'date' }).notNull().defaultNow(),
 });

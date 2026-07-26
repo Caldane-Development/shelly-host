@@ -7,6 +7,8 @@ import { siteRouter } from "../routers/site.router";
 import { wifiRouter } from "../routers/wifi.router";
 import { mqttBrokerRouter } from "../routers/mqtt-broker.router";
 import { siteConfigRouter } from "../routers/site-config.router";
+import { groupRouter } from "../routers/group.router";
+import { bridgeRouter } from "../routers/bridge.router";
 
 const init = (app: Express) => {
     logger.info(`Add middleware for json parser.`);
@@ -27,6 +29,8 @@ const init = (app: Express) => {
     app.use(`${process.env.VHOST_PREFIX}/wifi`, wifiRouter);
     app.use(`${process.env.VHOST_PREFIX}/mqtt-broker`, mqttBrokerRouter);
     app.use(`${process.env.VHOST_PREFIX}/site-config`, siteConfigRouter);
+    app.use(`${process.env.VHOST_PREFIX}/group`, groupRouter);
+    app.use(`${process.env.VHOST_PREFIX}/bridge`, bridgeRouter);
 
 };
 

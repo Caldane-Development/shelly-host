@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faWifi, faSitemap, faMicrochip, faTowerBroadcast, faDoorOpen } from "@fortawesome/free-solid-svg-icons";
+import { faWifi, faSitemap, faMicrochip, faTowerBroadcast, faDoorOpen, faObjectGroup } from "@fortawesome/free-solid-svg-icons";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { useNavigate } from "react-router-dom";
 import style from "./home.module.css";
@@ -35,6 +35,12 @@ const tiles: Tile[] = [
         label: "Rooms",
         description: "View rooms saved from device scans",
         icon: faDoorOpen,
+    },
+    {
+        path: "/groups",
+        label: "Switch Groups",
+        description: "Control multiple devices with one smart switch",
+        icon: faObjectGroup,
     },
     {
         path: "/mqtt-browser",

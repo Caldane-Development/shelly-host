@@ -5,12 +5,13 @@ import roomList from "../assets/json/room-list.json";
 import config from "../assets/json/config.json";
 import { logger } from "../logger";
 import os from "os";
-import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyGetMqttSettings, shellyReboot, shellyWebhookList } from "../utils/discovery.helper";
+import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyGetMqttSettings, shellyReboot, shellySetWifi, shellyWebhookList } from "../utils/discovery.helper";
 import { MqttResponse } from "../../../common/models/mqtt.interface";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
 import { mqttAddListener, mqtt as mqttClient } from "../utils/mqtt.helper";
 import { getStoredDevices, getStoredIDevices, getEnabledDevices, saveDiscoveredDevices } from "../utils/device.helper";
 import { getStoredRooms, saveDiscoveredRooms } from "../utils/room.helper";
+import { getWifiCredentialBySsid } from "../utils/wifi.helper";
 
 export const shellyRouter = Router();
 
@@ -220,4 +221,37 @@ shellyRouter.post("/:ip/webhook", async (req: Request, res: Response) => {
     }
 
     res.send(device);
+});
+
+shellyRouter.post("/:ip/wifi", async (req: Request, res: Response) => {
+    const ip = req.params.ip;
+    const ssid: string = (req.body.ssid || "").trim();
+    let password: string | undefined = req.body.password;
+
+    if (ssid === "") {
+        res.status(400).json({ error: "ssid is required" });
+        return;
+    }
+
+    // If no password is supplied, use the stored credential for this SSID.
+    if (password === undefined || password === "") {
+        const stored = await getWifiCredentialBySsid(ssid);
+        if (!stored) {
+            res.status(400).json({ error: `No stored WiFi credential for SSID "${ssid}". Provide a password.` });
+            return;
+        }
+        password = stored.password;
+    }
+
+    logger.info(`[server]: Changing WiFi for device with IP: ${ip} to SSID: ${ssid}`);
+    const result = await shellySetWifi(ip, ssid, password);
+
+    if (result) {
+        // Reboot so the device reconnects on the new network. It will get a new
+        // IP on the target subnet, so it becomes unreachable at this IP.
+        await shellyReboot(ip);
+        res.send({ ip, ssid, ...result });
+    } else {
+        res.status(404).send("Shelly device not found");
+    }
 });

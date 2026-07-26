@@ -1,4 +1,4 @@
-import { faCloudArrowUp, faCopy, faMessage, faObjectGroup, faPowerOff, faTowerBroadcast, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCloudArrowUp, faCopy, faMessage, faObjectGroup, faPowerOff, faTowerBroadcast, faWifi, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { IDevice } from "../../../../common/models/device.interface";
@@ -17,6 +17,12 @@ interface DialogBroker {
 interface DialogRoom {
     name: string;
     switches: { name: string }[];
+}
+
+interface WifiCredential {
+    id: number;
+    ssid: string;
+    password: string;
 }
 
 const copy = (text: string, label: string) => {
@@ -40,6 +46,13 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
     const [topicSwitch, setTopicSwitch] = useState("switch");
     const [dialogError, setDialogError] = useState("");
     const [submitting, setSubmitting] = useState(false);
+
+    // Change-WiFi dialog state
+    const [showWifiDialog, setShowWifiDialog] = useState(false);
+    const [wifiCredentials, setWifiCredentials] = useState<WifiCredential[]>([]);
+    const [selSsid, setSelSsid] = useState("");
+    const [wifiDialogError, setWifiDialogError] = useState("");
+    const [wifiSubmitting, setWifiSubmitting] = useState(false);
 
     useEffect(() => {
         setDeviceEntity(device);
@@ -104,22 +117,35 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
         setShowDialog(true);
 
         try {
-            const [brokersRes, roomsRes, siteRes] = await Promise.all([
+            const [brokersRes, roomsRes, devicesRes, siteRes] = await Promise.all([
                 fetch(`${BACKEND_URL}/mqtt-broker`),
-                fetch(`${BACKEND_URL}/site-config/rooms`),
+                fetch(`${BACKEND_URL}/shelly/rooms`),
+                fetch(`${BACKEND_URL}/shelly/devices`),
                 fetch(`${BACKEND_URL}/site-config`),
             ]);
 
             const brokers: DialogBroker[] = brokersRes.ok ? await brokersRes.json() : [];
-            const rooms: DialogRoom[] = roomsRes.ok ? await roomsRes.json() : [];
+            const roomRows: { id: number; name: string }[] = roomsRes.ok ? await roomsRes.json() : [];
+            const deviceRows: { id: string; name: string; roomId: number | null }[] = devicesRes.ok
+                ? await devicesRes.json()
+                : [];
             const site: { name: string } = siteRes.ok ? await siteRes.json() : { name: "" };
+
+            // Build the room -> switch cascade from the DB so every real room
+            // (not just the site.json catalog) is available for mirroring.
+            const rooms: DialogRoom[] = roomRows.map((room) => ({
+                name: room.name,
+                switches: deviceRows
+                    .filter((d) => d.roomId === room.id)
+                    .map((d) => ({ name: d.name })),
+            }));
 
             setDialogBrokers(brokers);
             setDialogRooms(rooms);
             setSiteName(site.name || "");
             setSelServer(deviceEntity.mqtt?.server || brokers[0]?.server || "");
 
-            // Preselect the device's current room if it exists in the catalog.
+            // Preselect the device's current room if it exists in the list.
             const matchedRoom = rooms.find((room) => slugify(room.name) === currentRoomSlug);
             const defaultRoom = matchedRoom ?? rooms[0];
             setSelRoom(defaultRoom ? slugify(defaultRoom.name) : "");
@@ -172,20 +198,75 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
         }
     };
 
-    const toggleMqtt = async (device: IDevice) => {
-        const name = device.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
-        const response = await fetch(`${BACKEND_URL}/message/client/${name}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ message: { id: device.ip, ...TOGGLE_MESSAGE }, channel: device.mqtt.topic_prefix }),
-        });
+    const openWifiDialog = async () => {
+        setWifiDialogError("");
+        setShowWifiDialog(true);
+        try {
+            const response = await fetch(`${BACKEND_URL}/wifi`);
+            const creds: WifiCredential[] = response.ok ? await response.json() : [];
+            setWifiCredentials(creds);
+            setSelSsid(creds[0]?.ssid || "");
+        } catch (err) {
+            console.error("Failed to load WiFi credentials", err);
+            setWifiDialogError("Could not load WiFi credentials from the server.");
+        }
+    };
 
-        if (response.ok) {
-            console.log("MQTT toggled successfully");
-        } else {
-            console.error("Failed to toggle MQTT");
+    const closeWifiDialog = () => {
+        setShowWifiDialog(false);
+        setWifiDialogError("");
+    };
+
+    const submitChangeWifi = async () => {
+        if (selSsid.trim() === "") {
+            setWifiDialogError("Choose a WiFi network.");
+            return;
+        }
+
+        setWifiSubmitting(true);
+        setWifiDialogError("");
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/${deviceEntity.ip}/wifi`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ssid: selSsid }),
+            });
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}`);
+            }
+            closeWifiDialog();
+            alert(
+                `WiFi change sent to ${deviceEntity.name}.\n\nThe device will reboot and reconnect to "${selSsid}". ` +
+                    `It will get a new IP on that network, so re-run the scanner to find it again.`
+            );
+        } catch (err) {
+            console.error("Failed to change WiFi", err);
+            setWifiDialogError("Could not change the WiFi on the device.");
+        } finally {
+            setWifiSubmitting(false);
+        }
+    };
+
+    // Toggle the switch over MQTT by publishing to the device's topic prefix.
+    // Devices that share a topic (e.g. a 3-way pairing) all react to the same
+    // message, so this drives the whole logical switch rather than one relay.
+    const togglePower = async (device: IDevice) => {
+        const name = device.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
+        try {
+            const response = await fetch(`${BACKEND_URL}/message/client/${name}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: { id: device.ip, ...TOGGLE_MESSAGE },
+                    channel: device.mqtt.topic_prefix,
+                }),
+            });
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}`);
+            }
+        } catch (err) {
+            console.error("Failed to toggle device over MQTT", err);
         }
     };
 
@@ -231,13 +312,18 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
                     </button>
                 )}
                 {deviceEntity.mqtt?.enable && (
-                    <button onClick={() => toggleMqtt(deviceEntity)}>
+                    <button onClick={() => togglePower(deviceEntity)}>
                         <FontAwesomeIcon icon={faPowerOff} data-status={deviceEntity.switchStatus.output} />
                     </button>
                 )}
                 {mode === "normal" && !deviceEntity.mqtt?.enable && (
                     <button className={style["enable-mqtt"]} onClick={openDialog}>
                         <FontAwesomeIcon icon={faTowerBroadcast} /> Enable MQTT
+                    </button>
+                )}
+                {mode === "normal" && (
+                    <button className={style["change-wifi"]} onClick={openWifiDialog} title="Change WiFi network">
+                        <FontAwesomeIcon icon={faWifi} /> Change WiFi
                     </button>
                 )}
             </p>
@@ -397,6 +483,66 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
                             </button>
                             <button type="button" className={style["dialog-submit"]} onClick={submitEnableMqtt} disabled={submitting}>
                                 {submitting ? "Enabling…" : "Enable MQTT"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showWifiDialog && (
+                <div className={style["dialog-overlay"]} onClick={closeWifiDialog}>
+                    <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
+                        <div className={style["dialog-header"]}>
+                            <h4>Change WiFi — {deviceEntity.name}</h4>
+                            <button className={style["dialog-close"]} onClick={closeWifiDialog} aria-label="Close">
+                                <FontAwesomeIcon icon={faXmark} />
+                            </button>
+                        </div>
+
+                        <p className={style["dialog-note"]}>
+                            Current network: <b>{deviceEntity.device?.ssid || "unknown"}</b>. The device will reboot,
+                            reconnect on the new network with a new IP, and drop off this list until you re-scan.
+                        </p>
+
+                        <label className={style["dialog-field"]}>
+                            <span>WiFi Network</span>
+                            <select
+                                value={selSsid}
+                                onChange={(e) => {
+                                    setSelSsid(e.target.value);
+                                    if (wifiDialogError) setWifiDialogError("");
+                                }}
+                            >
+                                {wifiCredentials.length === 0 ? (
+                                    <option value="">No saved WiFi credentials</option>
+                                ) : (
+                                    wifiCredentials.map((cred) => (
+                                        <option key={cred.id} value={cred.ssid}>
+                                            {cred.ssid}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </label>
+
+                        {wifiCredentials.length === 0 && (
+                            <p className={style["dialog-note"]}>
+                                Add WiFi credentials in Site Configs first.
+                            </p>
+                        )}
+
+                        {wifiDialogError && <p className={style.error}>{wifiDialogError}</p>}
+
+                        <div className={style["dialog-actions"]}>
+                            <button type="button" className={style["dialog-cancel"]} onClick={closeWifiDialog} disabled={wifiSubmitting}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className={style["dialog-submit"]}
+                                onClick={submitChangeWifi}
+                                disabled={wifiSubmitting || wifiCredentials.length === 0}
+                            >
+                                {wifiSubmitting ? "Sending…" : "Change WiFi"}
                             </button>
                         </div>
                     </div>

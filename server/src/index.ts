@@ -7,6 +7,7 @@ import { logEnv, logger } from "./logger";
 import { init } from "./utils/server.helper";
 import { ensureSchema } from "./db/client";
 import { loadSiteConfig } from "./utils/site-config.helper";
+import { loadBridges } from "./utils/bridge.helper";
 
 
 
@@ -16,6 +17,7 @@ ensureSchema()
     .then(() => logger.info("[server]: Database schema ensured"))
     .then(() => loadSiteConfig())
     .then((config) => logger.info(`[server]: Site config loaded (site: ${config.name})`))
+    .then(() => loadBridges())
     .catch((error) => logger.error(`[server]: Failed to ensure database schema: ${error}`));
 
 const app: Express = express();

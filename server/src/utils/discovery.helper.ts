@@ -7,7 +7,8 @@ import { MqttResult } from "../../../common/models/mqtt.interface";
 import { ShellyStatus, ShellyStatusResult } from "../../../common/models/shelly.interface";
 import { createMqttConfig } from "./mqtt.helper";
 import { Webhooks } from "../../../common/models/webhooks.interface";
-import { createWebhookConfig } from "./webhook.helper";
+import { createWebhookConfig, createGroupWebhookConfig } from "./webhook.helper";
+import { getSiteConfigCached } from "./site-config.helper";
 
 
 export const discoverShelly = async (ip: string): Promise<ShellyStatusResult | null> => {
@@ -39,9 +40,9 @@ export const discoverShelly = async (ip: string): Promise<ShellyStatusResult | n
 };
 
 export const shellyCloudDevices = async (): Promise<any> => {
-    const auth_key = process.env.SHELLY_CLOUD_AUTH_KEY;
+    const auth_key = getSiteConfigCached().cloudAuthKey;
     const postData = {
-        auth_key: auth_key, // Use your actual auth key here
+        auth_key: auth_key, // sourced from site config (DB)
     };
 
     const postResponse = await postRequest<{}>(
@@ -57,9 +58,9 @@ export const shellyCloudDevices = async (): Promise<any> => {
 };
 
 export const shellyCloudRooms = async (): Promise<any> => {
-    const auth_key = process.env.SHELLY_CLOUD_AUTH_KEY;
+    const auth_key = getSiteConfigCached().cloudAuthKey;
     const postData = {
-        auth_key: auth_key, // Use your actual auth key here
+        auth_key: auth_key, // sourced from site config (DB)
     };
 
     const postResponse = await postRequest<{}>(
@@ -165,6 +166,76 @@ export const shellyActivateMqtt = async (ip: string, device: any, overrides: Mqt
     }
 
     return null;
+};
+
+export const shellySetWifi = async (ip: string, ssid: string, password: string): Promise<any> => {
+    logger.info(`[server]: Setting WiFi for device at ${ip} to SSID: ${ssid}`);
+    const options = {
+        body: {
+            id: 0,
+            method: "WiFi.SetConfig",
+            params: {
+                config: {
+                    sta: {
+                        ssid,
+                        pass: password,
+                        enable: true,
+                    },
+                },
+            },
+        },
+    };
+
+    try {
+        const postResponse = await postRequest<{}>(
+            `http://${ip}/rpc/`,
+            {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
+                Accept: "application/json",
+                "User-Agent": "ShellyApp/1.0",
+                Connection: "keep-alive",
+            },
+            options.body
+        );
+        return { ip, ...postResponse };
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to set WiFi on device at ${ip}. Error: ${error.message}`);
+    }
+
+    return null;
+};
+
+export const shellySetSwitch = async (ip: string, on: boolean, channel: number = 0): Promise<boolean> => {
+    const options = {
+        body: {
+            id: 0,
+            method: "Switch.Set",
+            params: {
+                id: channel,
+                on,
+            },
+        },
+    };
+
+    try {
+        await postRequest<{}>(
+            `http://${ip}/rpc/`,
+            {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
+                Accept: "application/json",
+                "User-Agent": "ShellyApp/1.0",
+                Connection: "keep-alive",
+            },
+            options.body
+        );
+        return true;
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to set switch on device at ${ip}. Error: ${error.message}`);
+    }
+
+    return false;
 };
 
 export const shellyReboot = async (ip: string): Promise<any> => {
@@ -281,6 +352,36 @@ export const shellyActivateWebhook = async (ip: string, device: IDevice, mode: "
         return { ip: ip, ...postResponse };
     } catch (error: Error | any) {
         logger.info(`[server]: Failed to activate webhook on device at ${ip}. Error: ${error.message}`);
+    }
+
+    return null;
+}
+
+// Install a webhook on a physical device so a button press triggers a smart group.
+export const shellyActivateGroupWebhook = async (ip: string, groupId: number, mode: "on" | "off"): Promise<any> => {
+    const options = {
+        body: {
+            id: 0,
+            method: "Webhook.Create",
+            params: createGroupWebhookConfig(groupId, mode),
+        },
+    };
+
+    try {
+        const postResponse = await postRequest<{}>(
+            `http://${ip}/rpc/`,
+            {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
+                Accept: "application/json",
+                "User-Agent": "ShellyApp/1.0",
+                Connection: "keep-alive",
+            },
+            options.body
+        );
+        return { ip: ip, ...postResponse };
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to activate group webhook on device at ${ip}. Error: ${error.message}`);
     }
 
     return null;
