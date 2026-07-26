@@ -22,3 +22,6 @@ services:
   client:
     image: localhost:5000/shelly-host-client:${IMAGE_TAG:-latest}
     pull_policy: always
+    # The runtime (nginx) image doesn't need a TTY; leaving it on can keep an
+    # SSH-driven `compose up -d` session open during deploy.
+    tty: false

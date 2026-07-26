@@ -73,7 +73,7 @@ jobs:
           DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
         run: |
           set -euo pipefail
-          SSH="ssh -i ~/.ssh/github_runner_key -o StrictHostKeyChecking=no github-runner@10.10.10.28"
+          SSH="ssh -T -o BatchMode=yes -i ~/.ssh/github_runner_key -o StrictHostKeyChecking=no github-runner@10.10.10.28"
           SCP="scp -i ~/.ssh/github_runner_key -o StrictHostKeyChecking=no"
 
           $SSH "mkdir -p '$DEPLOY_PATH'"
@@ -96,7 +96,12 @@ jobs:
             export SHELLY_CLOUD_AUTH_KEY="${{ secrets.SHELLY_CLOUD_AUTH_KEY }}"
 
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            # Redirect 'up' stdio to a file: with -d the started containers can
+            # otherwise inherit this SSH channel's stdout pipe and keep the
+            # session open forever even though the stack is already up. Writing
+            # to a file (then cat'ing it) lets SSH close cleanly.
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans </dev/null >up.log 2>&1 || { cat up.log; exit 1; }
+            cat up.log
             docker image prune -f
             docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
           EOF
