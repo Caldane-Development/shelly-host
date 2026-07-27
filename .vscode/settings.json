@@ -9,6 +9,7 @@
         "git add": true,
         "git commit": true,
         "git push": true,
-        "git ls-remote": true
+        "git ls-remote": true,
+        "git remote": true
     }
 }

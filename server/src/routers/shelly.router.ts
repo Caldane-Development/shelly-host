@@ -8,11 +8,13 @@ import os from "os";
 import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyCloudDevices, shellyCloudRooms, shellyGetMqttSettings, shellyReboot, shellySetWifi, shellyWebhookList, shellyActivateCompanionWebhook, shellyDeleteCompanionWebhooks, shellyDetachInput } from "../utils/discovery.helper";
 import { MqttResponse } from "../../../common/models/mqtt.interface";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
+import { Hook } from "../../../common/models/webhooks.interface";
 import { mqttAddListener, mqtt as mqttClient } from "../utils/mqtt.helper";
 import { getStoredDevices, getStoredIDevices, getEnabledDevices, saveDiscoveredDevices } from "../utils/device.helper";
 import { getStoredRooms, saveDiscoveredRooms } from "../utils/room.helper";
 import { getWifiCredentialBySsid } from "../utils/wifi.helper";
 import { getSiteConfigCached } from "../utils/site-config.helper";
+import { postRequest } from "../utils/http.helper";
 
 export const shellyRouter = Router();
 
@@ -298,6 +300,23 @@ const isManagedWebhookUrl = (urlValue: string): boolean => {
     }
 };
 
+const replaceWebhookHost = (urlValue: string, host: string): string => {
+    try {
+        const parsed = new URL(urlValue);
+        parsed.host = host;
+        return parsed.toString();
+    } catch {
+        return urlValue.replace(/^https?:\/\/[^/]+/i, `http://${host}`);
+    }
+};
+
+const isRpcError = (payload: unknown): payload is { error: { message?: string; code?: number } } => {
+    if (!payload || typeof payload !== "object") {
+        return false;
+    }
+    return "error" in payload;
+};
+
 shellyRouter.post("/devices/webhooks/reapply", async (_: Request, res: Response) => {
     const webhookHost = getSiteConfigCached().webhook.trim();
     if (!webhookHost) {
@@ -336,30 +355,75 @@ shellyRouter.post("/devices/webhooks/reapply", async (_: Request, res: Response)
                 const webhookList = await shellyWebhookList(device.ip);
                 checked++;
                 const hooks = webhookList?.result?.hooks ?? [];
-                const managedUrls = hooks.flatMap((hook) => hook.urls ?? []).filter(isManagedWebhookUrl);
+                const managedHooks = hooks.filter((hook) => (hook.urls ?? []).some(isManagedWebhookUrl));
 
-                const hasIncorrectHost = managedUrls.some((urlValue) => {
+                const hasIncorrectHost = managedHooks.some((hook) => (hook.urls ?? []).some((urlValue) => {
                     const currentHost = extractUrlHost(urlValue);
                     return currentHost !== "" && currentHost !== desiredHost;
-                });
+                }));
 
                 if (!hasIncorrectHost) {
                     unchanged++;
                     continue;
                 }
 
-                const deviceWithHooks: IDevice = {
-                    ...device,
-                    webhooks: webhookList ?? undefined,
-                };
+                for (const hook of managedHooks) {
+                    const urls = hook.urls ?? [];
+                    const nextUrls = urls.map((urlValue) => {
+                        if (!isManagedWebhookUrl(urlValue)) {
+                            return urlValue;
+                        }
+                        const currentHost = extractUrlHost(urlValue);
+                        if (!currentHost || currentHost === desiredHost) {
+                            return urlValue;
+                        }
+                        return replaceWebhookHost(urlValue, webhookHost);
+                    });
 
-                const [onResult, offResult] = await Promise.all([
-                    shellyActivateWebhook(device.ip, deviceWithHooks, "on"),
-                    shellyActivateWebhook(device.ip, deviceWithHooks, "off"),
-                ]);
+                    const updateBody = {
+                        id: 0,
+                        method: "Webhook.Update",
+                        params: {
+                            id: hook.id,
+                            cid: hook.cid,
+                            enable: hook.enable,
+                            event: hook.event,
+                            name: hook.name,
+                            ssl_ca: hook.ssl_ca,
+                            urls: nextUrls,
+                            condition: hook.condition,
+                            repeat_period: hook.repeat_period,
+                        } as Hook,
+                    };
 
-                if (!onResult || !offResult) {
-                    failures.push({ ip: device.ip, name: device.name || "(unknown)", reason: "Webhook update failed" });
+                    const updateResult = await postRequest<Record<string, unknown>>(
+                        `http://${device.ip}/rpc/`,
+                        {
+                            "Content-Type": "application/json",
+                            Accept: "application/json",
+                            "User-Agent": "ShellyApp/1.0",
+                            Connection: "keep-alive",
+                        },
+                        updateBody
+                    );
+
+                    if (isRpcError(updateResult)) {
+                        const message = updateResult.error?.message || "Webhook.Update RPC error";
+                        throw new Error(message);
+                    }
+                }
+
+                const verify = await shellyWebhookList(device.ip);
+                const verifyHooks = verify?.result?.hooks ?? [];
+                const stillWrong = verifyHooks
+                    .filter((hook) => (hook.urls ?? []).some(isManagedWebhookUrl))
+                    .some((hook) => (hook.urls ?? []).some((urlValue) => {
+                        const currentHost = extractUrlHost(urlValue);
+                        return currentHost !== "" && currentHost !== desiredHost;
+                    }));
+
+                if (stillWrong) {
+                    failures.push({ ip: device.ip, name: device.name || "(unknown)", reason: "Webhook host still mismatched after update" });
                     continue;
                 }
 
