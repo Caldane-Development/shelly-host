@@ -286,7 +286,7 @@ const SiteConfigs = () => {
         const trimmedServer = server.trim();
 
         if (trimmedServer === "") {
-            setBrokerError("Enter a broker address, e.g. perceptor.local:1884");
+            setBrokerError("Enter a broker address, e.g. perceptor.local:1883");
             return;
         }
 
@@ -617,7 +617,7 @@ const SiteConfigs = () => {
                 <form className={style["broker-form"]} onSubmit={handleAddBroker}>
                     <input
                         type="text"
-                        placeholder="Broker address, e.g. perceptor.local:1884"
+                        placeholder="Broker address, e.g. perceptor.local:1883"
                         value={server}
                         onChange={(e) => {
                             setServer(e.target.value);
