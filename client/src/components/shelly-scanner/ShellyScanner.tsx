@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import style from "./shelly-scanner.module.css";
 import ProgressBar from "../progress-bar/ProgressBar";
 import { BACKEND_URL } from "../../constants/env";
-import ShellyEntity from "../shelly-entity/ShellyEntity";
+import ShellyEntity, { DeviceGroup } from "../shelly-entity/ShellyEntity";
 import { IDevice } from "../../../../common/models/device.interface";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
@@ -12,11 +12,27 @@ const ShellyScanner = () => {
     const [total, setTotal] = useState<number | null>(null);
     const [count, setCount] = useState(0);
     const [devices, setDevices] = useState<IDevice[]>([]);
+    const [groups, setGroups] = useState<DeviceGroup[]>([]);
     const [mode, setMode] = useState<string>("dev");
     const [scanning, setScanning] = useState(false);
 
     const scanId = useSelector((state: RootState) => state.scanner.scanId);
     const scanTargets = useSelector((state: RootState) => state.scanner.scanTargets);
+
+    // Load switch groups so each card can show its memberships / controlled
+    // groups. Refreshed when a card assigns a controller.
+    const fetchGroups = useCallback(async () => {
+        try {
+            const response = await fetch(`${BACKEND_URL}/group`);
+            setGroups(response.ok ? await response.json() : []);
+        } catch (err) {
+            console.error("Failed to fetch groups", err);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchGroups();
+    }, [fetchGroups]);
 
     useEffect(() => {
         const handleKeyPress = (() => {
@@ -178,7 +194,15 @@ const ShellyScanner = () => {
                                 ? (a?.room?.name || "Unknown").localeCompare(b?.room?.name || "Unknown", undefined, { sensitivity: "base" })
                                 : a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
                         )
-                        .map((device, index) => <ShellyEntity key={`shelly-${index}`} device={device} mode={mode} />)}
+                        .map((device, index) => (
+                            <ShellyEntity
+                                key={`shelly-${index}`}
+                                device={device}
+                                mode={mode}
+                                groups={groups}
+                                onGroupsChanged={fetchGroups}
+                            />
+                        ))}
             </article>
         </section>
     );

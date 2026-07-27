@@ -29,6 +29,14 @@ interface GroupOption {
     id: number;
     name: string;
     controllerDeviceId: string | null;
+    members?: { deviceId: string }[];
+}
+
+export interface DeviceGroup {
+    id: number;
+    name: string;
+    controllerDeviceId: string | null;
+    members?: { deviceId: string }[];
 }
 
 const copy = (text: string, label: string) => {
@@ -36,7 +44,17 @@ const copy = (text: string, label: string) => {
     alert(`**Copied to clipboard**\n${label}:\n${text}`);
 };
 
-const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
+const ShellyEntity = ({
+    device,
+    mode,
+    groups = [],
+    onGroupsChanged,
+}: {
+    device: IDevice;
+    mode: string;
+    groups?: DeviceGroup[];
+    onGroupsChanged?: () => void;
+}) => {
     const [deviceEntity, setDeviceEntity] = useState(device);
     const [deviceName, setDeviceName] = useState(device.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
 
@@ -310,6 +328,7 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
             }
             closeGroupDialog();
             const groupName = groupOptions.find((g) => String(g.id) === selGroup)?.name ?? selGroup;
+            onGroupsChanged?.();
             alert(`${deviceEntity.name} is now the controller for "${groupName}".`);
         } catch (err) {
             console.error("Failed to assign group controller", err);
@@ -342,6 +361,23 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
             console.error("Failed to toggle device over MQTT", err);
         }
     };
+
+    // Trigger a switch group this device controls, straight from its card.
+    const triggerGroup = async (groupId: number) => {
+        try {
+            const response = await fetch(`${BACKEND_URL}/group/${groupId}/trigger`, { method: "POST" });
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}`);
+            }
+        } catch (err) {
+            console.error("Failed to trigger group", err);
+        }
+    };
+
+    // Groups this device relates to, derived from the parent-provided list.
+    const deviceId = deviceEntity.device?.id?.toString() ?? "";
+    const memberGroups = groups.filter((g) => g.members?.some((m) => m.deviceId === deviceId));
+    const controlledGroups = groups.filter((g) => g.controllerDeviceId === deviceId);
 
     return (
         <section className={style["shelly-entity"]} data-mqtt={deviceEntity.mqtt?.enable ? "" : undefined} data-ip={deviceEntity.ip}>
@@ -378,6 +414,37 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
                     "N/A"
                 )}
             </p>
+            {(memberGroups.length > 0 || controlledGroups.length > 0) && (
+                <div className={style.groups}>
+                    {controlledGroups.length > 0 && (
+                        <p className={style["group-line"]}>
+                            <b>Controls:</b>
+                            {controlledGroups.map((group) => (
+                                <span key={group.id} className={style["group-tag"]}>
+                                    {group.name}
+                                    <button
+                                        className={style["group-trigger"]}
+                                        title={`Trigger ${group.name}`}
+                                        onClick={() => triggerGroup(group.id)}
+                                    >
+                                        <FontAwesomeIcon icon={faPowerOff} />
+                                    </button>
+                                </span>
+                            ))}
+                        </p>
+                    )}
+                    {memberGroups.length > 0 && (
+                        <p className={style["group-line"]}>
+                            <b>Member of:</b>
+                            {memberGroups.map((group) => (
+                                <span key={group.id} className={style["group-tag"]}>
+                                    {group.name}
+                                </span>
+                            ))}
+                        </p>
+                    )}
+                </div>
+            )}
             <p>
                 {(mode == "debug" || mode == "dev") && (
                     <button onClick={() => handleMqtt(deviceEntity)}>

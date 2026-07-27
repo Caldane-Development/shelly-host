@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import style from "./devices.module.css";
 import { BACKEND_URL } from "../../constants/env";
 import { IDevice } from "../../../../common/models/device.interface";
-import ShellyEntity from "../shelly-entity/ShellyEntity";
+import ShellyEntity, { DeviceGroup } from "../shelly-entity/ShellyEntity";
 
 // How often to re-poll live switch status so cards self-correct when devices
 // change state or come back online at a new IP after a WiFi migration.
@@ -44,8 +44,20 @@ const mirrorSharedTopics = (devices: IDevice[]): IDevice[] => {
 const Devices = () => {
     const navigate = useNavigate();
     const [devices, setDevices] = useState<IDevice[]>([]);
+    const [groups, setGroups] = useState<DeviceGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    // Load switch groups so each card can show its memberships / controlled
+    // groups. Refreshed when a card assigns a controller.
+    const fetchGroups = useCallback(async () => {
+        try {
+            const response = await fetch(`${BACKEND_URL}/group`);
+            setGroups(response.ok ? await response.json() : []);
+        } catch (err) {
+            console.error("Failed to fetch groups", err);
+        }
+    }, []);
 
     // Fetch live switch status (queried server-side over HTTP) and merge it into
     // the cards by device id. Safe to call repeatedly.
@@ -96,6 +108,10 @@ const Devices = () => {
 
         fetchDevices();
     }, [fetchStatuses]);
+
+    useEffect(() => {
+        fetchGroups();
+    }, [fetchGroups]);
 
     // Re-poll live status on an interval so the cards stay accurate even when the
     // page is left open (state changes, devices coming online at a new IP, etc.).
@@ -157,7 +173,13 @@ const Devices = () => {
                                 : a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
                         )
                         .map((device) => (
-                            <ShellyEntity key={device.device?.id ?? device.ip} device={device} mode="normal" />
+                            <ShellyEntity
+                                key={device.device?.id ?? device.ip}
+                                device={device}
+                                mode="normal"
+                                groups={groups}
+                                onGroupsChanged={fetchGroups}
+                            />
                         ))}
                 </div>
             )}

@@ -101,6 +101,48 @@ button.change-wifi {
     font-size: 0.85rem;
 }
 
+.groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0.25rem 0;
+}
+
+.group-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.group-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background-color: rgba(100, 108, 255, 0.15);
+    color: #646cff;
+    font-size: 0.75rem;
+}
+
+button.group-trigger {
+    background: #22c55e;
+    border: none;
+    border-radius: 50%;
+    width: 1.4rem;
+    height: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0;
+}
+
 .dialog-note {
     font-size: 0.8rem;
     color: #cbd5e1;
