@@ -875,7 +875,8 @@ const ShellyEntity = ({
 
                         <p className={style["dialog-note"]}>
                             Flipping <b>{deviceEntity.name}</b> will toggle the light on the target device below.
-                            Pick the room, then the device that has the actual load.
+                            The toggle is routed through the server (by device name + room), so it keeps working
+                            even if the target's IP changes. The target must have MQTT enabled.
                         </p>
 
                         <label className={style["dialog-field"]}>

@@ -67,18 +67,31 @@ export const createGroupWebhookConfig = (groupId: number, mode: "on" | "off", in
     };
 };
 
-// Webhook that makes a companion (3-way) switch toggle the relay on ANOTHER
-// device. Each physical toggle edge calls the target device's Switch.Toggle
-// directly, so one flip = one toggle regardless of the switch position.
+// Webhook that makes a companion (3-way) switch toggle another device's light.
+// Instead of calling the target's IP directly (fragile — Shelly IPs are DHCP),
+// each toggle edge hits the statically-addressed server, which publishes an
+// MQTT toggle to a topic derived from the target's name + room (both stable).
+// This is the same server-mediated path used by createWebhookConfig.
 export const createCompanionWebhookConfig = (
-    targetIp: string,
-    targetChannel: number,
+    targetName: string,
+    targetRoomId: number,
     mode: "on" | "off",
     inputId: number = 0
 ): Hook => {
+    const base = getSiteConfigCached().webhook;
+    const siteName = getSiteConfigCached().name;
+    const name = targetName.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
+    const clientName = "shelly";
+
+    if (!base) {
+        logger.info(
+            `[server]: Site config 'webhook' host is empty; companion webhook URL will be invalid. Set the webhook host in Site Config.`
+        );
+    }
+
     const hookMap = {
-        "on": { id: 1, event: "input.toggle_on", name: `Companion ${inputId} -> ${targetIp}` },
-        "off": { id: 2, event: "input.toggle_off", name: `Companion ${inputId} -> ${targetIp}` },
+        "on": { id: 1, event: "input.toggle_on", name: `Companion ${inputId} -> ${name}` },
+        "off": { id: 2, event: "input.toggle_off", name: `Companion ${inputId} -> ${name}` },
     };
 
     return {
@@ -89,7 +102,7 @@ export const createCompanionWebhookConfig = (
         "name": hookMap[mode].name,
         "ssl_ca": "ca.pem",
         "urls": [
-            `http://${targetIp}/rpc/Switch.Toggle?id=${targetChannel}`
+            `http://${base}/api/message/srd/${siteName}/${targetRoomId}/${name}/switch/message/toggle/${clientName}`
         ],
         "condition": null,
         "repeat_period": 0

@@ -466,14 +466,15 @@ export const shellyActivateGroupWebhook = async (ip: string, groupId: number, mo
     return null;
 }
 
-// Remove any previously-installed companion (3-way) toggle webhooks on a device
-// so re-linking stays idempotent instead of stacking duplicate hooks.
-export const shellyDeleteCompanionWebhooks = async (ip: string, targetIp: string): Promise<void> => {
+// Remove any previously-installed companion (3-way) toggle webhooks for a given
+// target on a device so re-linking stays idempotent instead of stacking hooks.
+export const shellyDeleteCompanionWebhooks = async (ip: string, targetName: string): Promise<void> => {
     const headers = {
         "Content-Type": "application/json",
         Accept: "application/json",
         "User-Agent": "ShellyApp/1.0",
     };
+    const slug = targetName.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
     try {
         const list = await postRequest<{ result?: { hooks?: { id: number; urls?: string[] }[] } }>(
             `http://${ip}/rpc/`,
@@ -481,7 +482,7 @@ export const shellyDeleteCompanionWebhooks = async (ip: string, targetIp: string
             { id: 0, method: "Webhook.List" }
         );
         const hooks = list?.result?.hooks ?? [];
-        const marker = `//${targetIp}/rpc/Switch.Toggle`;
+        const marker = `/${slug}/switch/message/toggle`;
         for (const hook of hooks) {
             if ((hook.urls ?? []).some((url) => url.includes(marker))) {
                 await postRequest(`http://${ip}/rpc/`, headers, {
@@ -518,11 +519,12 @@ export const shellyDetachInput = async (ip: string, switchId: number = 0): Promi
 };
 
 // Install a companion (3-way) toggle webhook: a physical toggle edge on `ip`
-// input `inputId` toggles the relay on `targetIp` channel `targetChannel`.
+// input `inputId` toggles the target device (by name + room) via the server's
+// MQTT message endpoint, so it survives target IP (DHCP) changes.
 export const shellyActivateCompanionWebhook = async (
     ip: string,
-    targetIp: string,
-    targetChannel: number,
+    targetName: string,
+    targetRoomId: number,
     mode: "on" | "off",
     inputId: number = 0
 ): Promise<any> => {
@@ -530,7 +532,7 @@ export const shellyActivateCompanionWebhook = async (
         body: {
             id: 0,
             method: "Webhook.Create",
-            params: createCompanionWebhookConfig(targetIp, targetChannel, mode, inputId),
+            params: createCompanionWebhookConfig(targetName, targetRoomId, mode, inputId),
         },
     };
 
