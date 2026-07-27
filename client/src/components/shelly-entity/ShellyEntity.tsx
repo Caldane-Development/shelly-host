@@ -390,13 +390,13 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
                     </button>
                 )}
                 {mode === "normal" && !deviceEntity.mqtt?.enable && (
-                    <button className={style["enable-mqtt"]} onClick={openDialog}>
-                        <FontAwesomeIcon icon={faTowerBroadcast} /> Enable MQTT
+                    <button className={style["enable-mqtt"]} onClick={openDialog} title="Enable MQTT">
+                        <FontAwesomeIcon icon={faTowerBroadcast} />
                     </button>
                 )}
                 {mode === "normal" && (
                     <button className={style["change-wifi"]} onClick={openWifiDialog} title="Change WiFi network">
-                        <FontAwesomeIcon icon={faWifi} /> Change WiFi
+                        <FontAwesomeIcon icon={faWifi} />
                     </button>
                 )}
                 {mode === "normal" && (
@@ -405,7 +405,7 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
                         onClick={openGroupDialog}
                         title="Assign this device as a switch-group controller"
                     >
-                        <FontAwesomeIcon icon={faObjectGroup} /> Group Controller
+                        <FontAwesomeIcon icon={faObjectGroup} />
                     </button>
                 )}
             </p>
