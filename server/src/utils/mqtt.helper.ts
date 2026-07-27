@@ -49,6 +49,7 @@ export interface MqttMonitorMessage {
 export interface MqttMonitorStatus {
     broker: string;
     connected: boolean;
+    lastError: string;
 }
 
 const monitors: Map<string, (message: MqttMonitorMessage) => void> = new Map();
@@ -56,6 +57,7 @@ let client: mqttLibrary.MqttClient | null = null;
 let activeClientKey = "";
 let activeBrokerLabel = "";
 let mqttConnected = false;
+let lastMqttError = "";
 
 const buildBrokerUrl = (server: string): string =>
     /^[a-z]+:\/\//i.test(server) ? server : `mqtt://${server}`;
@@ -223,6 +225,7 @@ export const refreshMqttConnection = async (): Promise<void> => {
         activeClientKey = "";
         activeBrokerLabel = "";
         mqttConnected = false;
+        lastMqttError = "";
         logger.warn("[server]: MQTT monitor disabled because no broker is configured");
         return;
     }
@@ -236,6 +239,7 @@ export const refreshMqttConnection = async (): Promise<void> => {
     activeClientKey = nextConnection.key;
     activeBrokerLabel = nextConnection.brokerLabel;
     mqttConnected = false;
+    lastMqttError = "";
     await closeClient(previousClient);
 
     const nextClient = mqttLibrary.connect(nextConnection.url, nextConnection.options);
@@ -247,6 +251,7 @@ export const refreshMqttConnection = async (): Promise<void> => {
             return;
         }
         mqttConnected = true;
+        lastMqttError = "";
         logger.info(`[server]: MQTT monitor connected to ${nextConnection.brokerLabel}`);
         subscribeMonitorTopics(nextClient, nextConnection.brokerLabel);
     });
@@ -256,6 +261,7 @@ export const refreshMqttConnection = async (): Promise<void> => {
             return;
         }
         mqttConnected = false;
+        lastMqttError = error.message;
         logger.error(`[server]: MQTT monitor error on ${nextConnection.brokerLabel}: ${error}`);
     });
 
@@ -288,6 +294,7 @@ export const mqttRemoveMonitor = (id: string) => {
 export const getMqttMonitorStatus = (): MqttMonitorStatus => ({
     broker: activeBrokerLabel,
     connected: mqttConnected,
+    lastError: lastMqttError,
 });
 
 export const mqtt = {

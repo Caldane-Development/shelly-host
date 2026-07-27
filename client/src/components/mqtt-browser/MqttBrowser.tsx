@@ -13,6 +13,7 @@ interface MqttMessage {
 interface MqttMonitorStatus {
     broker: string;
     connected: boolean;
+    lastError: string;
 }
 
 const MAX_MESSAGES = 500;
@@ -31,7 +32,7 @@ const MqttBrowser = () => {
     const [error, setError] = useState(false);
     const [paused, setPaused] = useState(false);
     const [filter, setFilter] = useState("");
-    const [monitorStatus, setMonitorStatus] = useState<MqttMonitorStatus>({ broker: "", connected: false });
+    const [monitorStatus, setMonitorStatus] = useState<MqttMonitorStatus>({ broker: "", connected: false, lastError: "" });
     const pausedRef = useRef(paused);
 
     useEffect(() => {
@@ -110,6 +111,11 @@ const MqttBrowser = () => {
                 <span className={monitorStatus.connected ? `${style.status} ${style.connectedToBroker}` : `${style.status} ${style.disconnectedBroker}`}>
                     Broker: {monitorStatus.broker || "Not configured"}
                 </span>
+                {!monitorStatus.connected && monitorStatus.lastError && (
+                    <span className={`${style.status} ${style.disconnectedBroker}`}>
+                        MQTT Error: {monitorStatus.lastError}
+                    </span>
+                )}
                 <input
                     type="text"
                     className={style.filter}

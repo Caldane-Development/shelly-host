@@ -13,9 +13,11 @@ messageRouter.get("/", (_: Request, res: Response) => {
 
 messageRouter.get("/monitor", (req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
+    res.write(": connected\n\n");
 
     const monitorId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     logger.info(`[server]: MQTT monitor connected: ${monitorId}`);
