@@ -406,6 +406,36 @@ export const shellyActivateWebhook = async (ip: string, device: IDevice, mode: "
     return null;
 }
 
+// Remove any previously-installed trigger webhooks for a group on a device so
+// re-assigning a controller doesn't accumulate duplicate or stale hooks.
+export const shellyDeleteGroupWebhooks = async (ip: string, groupId: number): Promise<void> => {
+    const headers = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "ShellyApp/1.0",
+    };
+    try {
+        const list = await postRequest<{ result?: { hooks?: { id: number; urls?: string[] }[] } }>(
+            `http://${ip}/rpc/`,
+            headers,
+            { id: 0, method: "Webhook.List" }
+        );
+        const hooks = list?.result?.hooks ?? [];
+        const marker = `/api/group/${groupId}/trigger`;
+        for (const hook of hooks) {
+            if ((hook.urls ?? []).some((url) => url.includes(marker))) {
+                await postRequest(`http://${ip}/rpc/`, headers, {
+                    id: 0,
+                    method: "Webhook.Delete",
+                    params: { id: hook.id },
+                });
+            }
+        }
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to clear group webhooks on device at ${ip}. Error: ${error.message}`);
+    }
+};
+
 // Install a webhook on a physical device so a button press triggers a smart group.
 export const shellyActivateGroupWebhook = async (ip: string, groupId: number, mode: "on" | "off"): Promise<any> => {
     const options = {

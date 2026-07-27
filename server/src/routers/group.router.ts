@@ -11,7 +11,7 @@ import {
     setMembers,
     triggerGroup,
 } from "../utils/group.helper";
-import { shellyActivateGroupWebhook } from "../utils/discovery.helper";
+import { shellyActivateGroupWebhook, shellyDeleteGroupWebhooks } from "../utils/discovery.helper";
 
 export const groupRouter = Router();
 
@@ -133,6 +133,18 @@ groupRouter.post("/:id/controller", async (req: Request, res: Response) => {
     if (!device || !device.ip) {
         return res.status(404).send("Controller device not found or has no IP");
     }
+    // If a different device previously controlled this group, remove its stale hooks.
+    if (group.controllerDeviceId && group.controllerDeviceId !== String(deviceId)) {
+        const [previous] = await db
+            .select()
+            .from(devicesTable)
+            .where(eq(devicesTable.id, String(group.controllerDeviceId)));
+        if (previous?.ip) {
+            await shellyDeleteGroupWebhooks(previous.ip, id);
+        }
+    }
+    // Clear any existing hooks for this group on the target device to stay idempotent.
+    await shellyDeleteGroupWebhooks(device.ip, id);
     const on = await shellyActivateGroupWebhook(device.ip, id, "on");
     const off = await shellyActivateGroupWebhook(device.ip, id, "off");
     if (!on || !off) {

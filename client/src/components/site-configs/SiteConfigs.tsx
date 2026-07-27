@@ -32,6 +32,8 @@ const SiteConfigs = () => {
     // Site config state
     const [siteName, setSiteName] = useState("");
     const [siteMqtt, setSiteMqtt] = useState("");
+    // Host:port the Shelly devices call back to when an input toggles (group triggers).
+    const [siteWebhook, setSiteWebhook] = useState("");
     const [siteLoading, setSiteLoading] = useState(true);
     const [siteError, setSiteError] = useState("");
     const [siteSaved, setSiteSaved] = useState(false);
@@ -125,9 +127,10 @@ const SiteConfigs = () => {
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            const data: { name: string; mqtt: string; cloudAuthKey?: string } = await response.json();
+            const data: { name: string; mqtt: string; webhook?: string; cloudAuthKey?: string } = await response.json();
             setSiteName(data.name ?? "");
             setSiteMqtt(data.mqtt ?? "");
+            setSiteWebhook(data.webhook ?? "");
             setSiteCloudKeyHint(data.cloudAuthKey ?? "");
         } catch (err) {
             console.error("Failed to fetch site config", err);
@@ -154,6 +157,7 @@ const SiteConfigs = () => {
                 body: JSON.stringify({
                     name: trimmedName,
                     mqtt: siteMqtt.trim(),
+                    webhook: siteWebhook.trim(),
                     // Only send the key when the user actually entered one, so we
                     // never persist the masked hint back over the real key.
                     ...(trimmedCloudKey !== "" ? { cloudAuthKey: trimmedCloudKey } : {}),
@@ -162,9 +166,10 @@ const SiteConfigs = () => {
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            const data: { name: string; mqtt: string; cloudAuthKey?: string } = await response.json();
+            const data: { name: string; mqtt: string; webhook?: string; cloudAuthKey?: string } = await response.json();
             setSiteName(data.name ?? "");
             setSiteMqtt(data.mqtt ?? "");
+            setSiteWebhook(data.webhook ?? "");
             setSiteCloudKeyHint(data.cloudAuthKey ?? "");
             setSiteCloudKey("");
             setSiteError("");
@@ -361,6 +366,15 @@ const SiteConfigs = () => {
                                 <option value={siteMqtt}>{siteMqtt}</option>
                             )}
                         </select>
+                        <input
+                            type="text"
+                            placeholder="Webhook host, e.g. 10.10.10.28:4501"
+                            value={siteWebhook}
+                            onChange={(e) => {
+                                setSiteWebhook(e.target.value);
+                                if (siteError) setSiteError("");
+                            }}
+                        />
                         <div className={style["password-field"]}>
                             <input
                                 type={showCloudKey ? "text" : "password"}

@@ -1,6 +1,7 @@
 import site from "../assets/json/site.json";
 import { Hook } from "../../../common/models/webhooks.interface";
 import { getSiteConfigCached } from "./site-config.helper";
+import { logger } from "../logger";
 
 export const createWebhookConfig = (deviceName: string, room: number, clientName: string, mode: "on" | "off"): Hook => {
     const name = deviceName.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
@@ -39,6 +40,12 @@ export const createWebhookConfig = (deviceName: string, room: number, clientName
 export const createGroupWebhookConfig = (groupId: number, mode: "on" | "off"): Hook => {
     const base = getSiteConfigCached().webhook;
     const siteName = getSiteConfigCached().name;
+
+    if (!base) {
+        logger.info(
+            `[server]: Site config 'webhook' host is empty; group ${groupId} webhook URL will be invalid. Set the webhook host in Site Config.`
+        );
+    }
 
     const hookMap = {
         "on": { id: 1, event: "input.toggle_on", name: `Group ${groupId} Toggle On` },
