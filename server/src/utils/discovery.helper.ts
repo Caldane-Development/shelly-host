@@ -1,7 +1,8 @@
 import { cli } from "winston/lib/winston/config";
 import config from "../assets/json/config.json";
+import deviceOverridesJson from "../assets/json/device-overrides.json";
 import { logger } from "../logger";
-import { postRequest } from "./http.helper";
+import { getRequest, postRequest } from "./http.helper";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
 import { MqttResult } from "../../../common/models/mqtt.interface";
 import { ShellyStatus, ShellyStatusResult } from "../../../common/models/shelly.interface";
@@ -37,6 +38,41 @@ export const discoverShelly = async (ip: string): Promise<ShellyStatusResult | n
     }
 
     return null;
+};
+
+interface ShellyDeviceInfo {
+    name: string | null;
+    id: string;
+    mac: string;
+    model?: string;
+}
+
+// Per-device manual corrections, keyed by lowercase MAC. Some attributes (most
+// notably the room) live only in the Shelly Smart Control app and are not
+// exposed by the device itself or the legacy cloud catalog, so we allow a
+// server-side override to bring discovery in line with what the user sees in
+// the app. Only fields present in the override are applied.
+interface DeviceOverride {
+    name?: string;
+    roomId?: number;
+    note?: string;
+}
+const deviceOverrides: Record<string, DeviceOverride> = deviceOverridesJson;
+
+// Read the name configured on the device itself (Shelly.GetDeviceInfo). This is
+// the authoritative display name — it reflects what the user set on the device,
+// independent of any cloud account. Best-effort: returns null on failure so it
+// never breaks discovery.
+export const shellyDeviceInfo = async (ip: string): Promise<ShellyDeviceInfo | null> => {
+    try {
+        return await getRequest<ShellyDeviceInfo>(`http://${ip}/rpc/Shelly.GetDeviceInfo`, {
+            Accept: "application/json",
+            "User-Agent": "ShellyApp/1.0",
+        });
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to read device info at ${ip}. Error: ${error.message}`);
+        return null;
+    }
 };
 
 export const shellyCloudDevices = async (): Promise<any> => {
@@ -89,19 +125,32 @@ export const composeShellyDevice = async (
             logger.info(`[server]: Device at ${ip} is not reachable.`);
             return null;
         }
-        const deviceInList = devices.data.devices[device.sys.mac.toLocaleLowerCase()];
+        const mac = device.sys.mac.toLocaleLowerCase();
+        const deviceInList = devices.data.devices[mac];
+        const override = deviceOverrides[mac];
+        // Prefer the name set on the device itself over the cloud catalog name.
+        // The on-device name reflects what the user configured (e.g. "Wetbar 1")
+        // and is independent of any cloud account; fall back to the manual
+        // override, then the catalog name when the device has no name set.
+        const deviceInfo = await shellyDeviceInfo(ip);
+        const displayName = deviceInfo?.name?.trim() || override?.name || deviceInList?.name;
+        // The room only exists in the Shelly app, so honour a manual override
+        // before falling back to the catalog's room assignment.
+        const effectiveRoomId = override?.roomId ?? deviceInList?.room_id;
         const enrichedDevice = {
             ...deviceInList,
+            name: displayName,
+            room_id: effectiveRoomId,
             ip: device.wifi?.sta_ip || ip,
-            ssid: device.wifi?.ssid || deviceInList.ssid,
+            ssid: device.wifi?.ssid || deviceInList?.ssid,
         };
         response = {
             ip: ip,
-            name: deviceInList.name,
-            type: deviceInList.type,
+            name: displayName,
+            type: deviceInList?.type,
             channel: "",
-            mqtt: createMqttConfig(deviceInList.name, rooms.data.rooms[deviceInList.room_id]),
-            room: deviceInList.room_id ? rooms.data.rooms[deviceInList.room_id] : null,
+            mqtt: createMqttConfig(deviceInList?.name, rooms.data.rooms[effectiveRoomId]),
+            room: effectiveRoomId ? rooms.data.rooms[effectiveRoomId] : null,
             switchStatus: device["switch:0"],
             device: enrichedDevice,
         }
