@@ -16,6 +16,8 @@ interface MqttMonitorStatus {
     lastError: string;
 }
 
+type StreamState = "connecting" | "connected" | "reconnecting" | "disconnected";
+
 const MAX_MESSAGES = 500;
 
 const formatPayload = (payload: string): string => {
@@ -28,8 +30,7 @@ const formatPayload = (payload: string): string => {
 
 const MqttBrowser = () => {
     const [messages, setMessages] = useState<MqttMessage[]>([]);
-    const [connected, setConnected] = useState(false);
-    const [error, setError] = useState(false);
+    const [streamState, setStreamState] = useState<StreamState>("connecting");
     const [paused, setPaused] = useState(false);
     const [filter, setFilter] = useState("");
     const [monitorStatus, setMonitorStatus] = useState<MqttMonitorStatus>({ broker: "", connected: false, lastError: "" });
@@ -60,8 +61,7 @@ const MqttBrowser = () => {
         }, 5000);
 
         eventSource.onopen = () => {
-            setConnected(true);
-            setError(false);
+            setStreamState("connected");
             void fetchMonitorStatus();
         };
 
@@ -71,6 +71,7 @@ const MqttBrowser = () => {
             }
             try {
                 const data: MqttMessage = JSON.parse(event.data);
+                setStreamState("connected");
                 setMessages((prev) => [data, ...prev].slice(0, MAX_MESSAGES));
             } catch (err) {
                 console.error("Failed to parse MQTT monitor message", err);
@@ -78,8 +79,7 @@ const MqttBrowser = () => {
         };
 
         eventSource.onerror = () => {
-            setConnected(false);
-            setError(true);
+            setStreamState(eventSource.readyState === EventSource.CLOSED ? "disconnected" : "reconnecting");
             void fetchMonitorStatus();
         };
 
@@ -93,11 +93,21 @@ const MqttBrowser = () => {
         ? messages.filter((m) => m.topic.toLowerCase().includes(filter.toLowerCase()))
         : messages;
 
-    const statusClass = error
-        ? `${style.status} ${style.error}`
-        : connected
+    const statusClass = streamState === "connected"
         ? `${style.status} ${style.connected}`
+        : streamState === "reconnecting"
+        ? `${style.status} ${style.reconnecting}`
+        : streamState === "disconnected"
+        ? `${style.status} ${style.error}`
         : style.status;
+
+    const streamLabel = streamState === "connected"
+        ? "Connected"
+        : streamState === "reconnecting"
+        ? "Reconnecting…"
+        : streamState === "disconnected"
+        ? "Disconnected"
+        : "Connecting…";
 
     return (
         <section className={style["mqtt-browser"]}>
@@ -106,7 +116,7 @@ const MqttBrowser = () => {
             <div className={style.toolbar}>
                 <span className={statusClass}>
                     <span className={style.dot} />
-                    {error ? "Disconnected" : connected ? "Connected" : "Connecting…"}
+                    {streamLabel}
                 </span>
                 <span className={monitorStatus.connected ? `${style.status} ${style.connectedToBroker}` : `${style.status} ${style.disconnectedBroker}`}>
                     Broker: {monitorStatus.broker || "Not configured"}

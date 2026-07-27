@@ -19,6 +19,11 @@ messageRouter.get("/monitor", (req: Request, res: Response) => {
     res.flushHeaders();
     res.write(": connected\n\n");
 
+    // Keep SSE alive through proxies/load balancers that close idle streams.
+    const heartbeat = setInterval(() => {
+        res.write(": heartbeat\n\n");
+    }, 15000);
+
     const monitorId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     logger.info(`[server]: MQTT monitor connected: ${monitorId}`);
 
@@ -27,6 +32,7 @@ messageRouter.get("/monitor", (req: Request, res: Response) => {
     });
 
     req.on("close", () => {
+        clearInterval(heartbeat);
         mqttRemoveMonitor(monitorId);
         logger.info(`[server]: MQTT monitor disconnected: ${monitorId}`);
     });

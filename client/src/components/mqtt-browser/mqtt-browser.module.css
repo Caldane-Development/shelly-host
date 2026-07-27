@@ -35,6 +35,10 @@ section.mqtt-browser {
   background-color: #e5484d;
 }
 
+.status.reconnecting .dot {
+  background-color: #f0b429;
+}
+
 .connectedToBroker {
   color: #30a46c;
 }
