@@ -81,9 +81,26 @@ const subscribeMonitorTopics = (mqttClient: mqttLibrary.MqttClient, brokerLabel:
     });
 };
 
+const stripLeadingSlash = (value: string): string => value.replace(/^\/+/, "");
+
+const isSiteScopedTopic = (topic: string): boolean => {
+    const siteName = getSiteConfigCached().name.trim().toLocaleLowerCase();
+    if (!siteName) {
+        return false;
+    }
+
+    const normalizedTopic = stripLeadingSlash(topic).toLocaleLowerCase();
+    const normalizedSite = stripLeadingSlash(siteName);
+
+    return normalizedTopic === normalizedSite
+        || normalizedTopic.startsWith(`${normalizedSite}/`)
+        || normalizedTopic.startsWith(`${normalizedSite}.`);
+};
+
 const handleIncomingMessage = (topic: string, message: Buffer) => {
-    // Forward every message to any active monitors before other processing
-    if (monitors.size > 0) {
+    // Only forward site-scoped topics to monitors so shared-broker noise (for
+    // example Frigate topics) stays out of the MQTT browser.
+    if (monitors.size > 0 && isSiteScopedTopic(topic)) {
         const monitorMessage: MqttMonitorMessage = {
             topic,
             message: message.toString(),
