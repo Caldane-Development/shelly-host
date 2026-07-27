@@ -437,12 +437,12 @@ export const shellyDeleteGroupWebhooks = async (ip: string, groupId: number): Pr
 };
 
 // Install a webhook on a physical device so a button press triggers a smart group.
-export const shellyActivateGroupWebhook = async (ip: string, groupId: number, mode: "on" | "off"): Promise<any> => {
+export const shellyActivateGroupWebhook = async (ip: string, groupId: number, mode: "on" | "off", inputId: number = 0): Promise<any> => {
     const options = {
         body: {
             id: 0,
             method: "Webhook.Create",
-            params: createGroupWebhookConfig(groupId, mode),
+            params: createGroupWebhookConfig(groupId, mode, inputId),
         },
     };
 

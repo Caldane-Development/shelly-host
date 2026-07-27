@@ -82,6 +82,7 @@ const ShellyEntity = ({
     const [showGroupDialog, setShowGroupDialog] = useState(false);
     const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
     const [selGroup, setSelGroup] = useState<string>("");
+    const [selInput, setSelInput] = useState<string>("0");
     const [groupDialogError, setGroupDialogError] = useState("");
     const [groupSubmitting, setGroupSubmitting] = useState(false);
 
@@ -321,7 +322,7 @@ const ShellyEntity = ({
             const response = await fetch(`${BACKEND_URL}/group/${selGroup}/controller`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ deviceId }),
+                body: JSON.stringify({ deviceId, inputId: Number(selInput) }),
             });
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
@@ -730,6 +731,20 @@ const ShellyEntity = ({
                                         </option>
                                     ))
                                 )}
+                            </select>
+                        </label>
+
+                        <label className={style["dialog-field"]}>
+                            <span>Trigger Input</span>
+                            <select
+                                value={selInput}
+                                onChange={(e) => setSelInput(e.target.value)}
+                            >
+                                {[0, 1, 2, 3].map((n) => (
+                                    <option key={n} value={String(n)}>
+                                        Input {n}
+                                    </option>
+                                ))}
                             </select>
                         </label>
 

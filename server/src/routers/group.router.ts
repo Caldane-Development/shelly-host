@@ -125,6 +125,10 @@ groupRouter.post("/:id/controller", async (req: Request, res: Response) => {
     if (!deviceId) {
         return res.status(400).send("deviceId is required");
     }
+    const inputId = Number(req.body?.inputId ?? 0);
+    if (!Number.isInteger(inputId) || inputId < 0) {
+        return res.status(400).send("inputId must be a non-negative integer");
+    }
     const group = await getGroup(id);
     if (!group) {
         return res.status(404).send("Group not found");
@@ -145,8 +149,8 @@ groupRouter.post("/:id/controller", async (req: Request, res: Response) => {
     }
     // Clear any existing hooks for this group on the target device to stay idempotent.
     await shellyDeleteGroupWebhooks(device.ip, id);
-    const on = await shellyActivateGroupWebhook(device.ip, id, "on");
-    const off = await shellyActivateGroupWebhook(device.ip, id, "off");
+    const on = await shellyActivateGroupWebhook(device.ip, id, "on", inputId);
+    const off = await shellyActivateGroupWebhook(device.ip, id, "off", inputId);
     if (!on || !off) {
         return res.status(502).send("Failed to install webhook on controller device");
     }

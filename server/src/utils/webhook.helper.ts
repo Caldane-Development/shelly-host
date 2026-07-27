@@ -37,7 +37,7 @@ export const createWebhookConfig = (deviceName: string, room: number, clientName
 // Webhook that fires on either physical toggle edge and triggers a smart group.
 // The group decides all-on vs all-off from live device state, so both edges
 // point at the same trigger endpoint.
-export const createGroupWebhookConfig = (groupId: number, mode: "on" | "off"): Hook => {
+export const createGroupWebhookConfig = (groupId: number, mode: "on" | "off", inputId: number = 0): Hook => {
     const base = getSiteConfigCached().webhook;
     const siteName = getSiteConfigCached().name;
 
@@ -54,7 +54,7 @@ export const createGroupWebhookConfig = (groupId: number, mode: "on" | "off"): H
 
     return {
         "id": hookMap[mode].id,
-        "cid": 0,
+        "cid": inputId,
         "enable": true,
         "event": hookMap[mode].event,
         "name": hookMap[mode].name,
