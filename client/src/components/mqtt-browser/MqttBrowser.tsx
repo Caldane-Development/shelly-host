@@ -10,6 +10,11 @@ interface MqttMessage {
     timestamp: string;
 }
 
+interface MqttMonitorStatus {
+    broker: string;
+    connected: boolean;
+}
+
 const MAX_MESSAGES = 500;
 
 const formatPayload = (payload: string): string => {
@@ -26,6 +31,7 @@ const MqttBrowser = () => {
     const [error, setError] = useState(false);
     const [paused, setPaused] = useState(false);
     const [filter, setFilter] = useState("");
+    const [monitorStatus, setMonitorStatus] = useState<MqttMonitorStatus>({ broker: "", connected: false });
     const pausedRef = useRef(paused);
 
     useEffect(() => {
@@ -33,11 +39,29 @@ const MqttBrowser = () => {
     }, [paused]);
 
     useEffect(() => {
+        const fetchMonitorStatus = async () => {
+            try {
+                const response = await fetch(`${BACKEND_URL}/message/monitor/status`);
+                if (!response.ok) {
+                    throw new Error(`Request failed: ${response.status}`);
+                }
+                const data: MqttMonitorStatus = await response.json();
+                setMonitorStatus(data);
+            } catch (err) {
+                console.error("Failed to fetch MQTT monitor status", err);
+            }
+        };
+
         const eventSource = new EventSource(`${BACKEND_URL}/message/monitor`);
+        void fetchMonitorStatus();
+        const statusInterval = window.setInterval(() => {
+            void fetchMonitorStatus();
+        }, 5000);
 
         eventSource.onopen = () => {
             setConnected(true);
             setError(false);
+            void fetchMonitorStatus();
         };
 
         eventSource.onmessage = (event) => {
@@ -55,9 +79,11 @@ const MqttBrowser = () => {
         eventSource.onerror = () => {
             setConnected(false);
             setError(true);
+            void fetchMonitorStatus();
         };
 
         return () => {
+            window.clearInterval(statusInterval);
             eventSource.close();
         };
     }, []);
@@ -80,6 +106,9 @@ const MqttBrowser = () => {
                 <span className={statusClass}>
                     <span className={style.dot} />
                     {error ? "Disconnected" : connected ? "Connected" : "Connecting…"}
+                </span>
+                <span className={monitorStatus.connected ? `${style.status} ${style.connectedToBroker}` : `${style.status} ${style.disconnectedBroker}`}>
+                    Broker: {monitorStatus.broker || "Not configured"}
                 </span>
                 <input
                     type="text"

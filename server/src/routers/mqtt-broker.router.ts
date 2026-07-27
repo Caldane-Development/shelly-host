@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { logger } from "../logger";
 import { deleteMqttBroker, getAvailableBrokers, getMqttBrokers, saveMqttBroker } from "../utils/mqtt-broker.helper";
+import { refreshMqttConnection } from "../utils/mqtt.helper";
 
 export const mqttBrokerRouter = Router();
 
@@ -38,6 +39,7 @@ mqttBrokerRouter.post("/", async (req: Request, res: Response) => {
             typeof username === "string" ? username.trim() : "",
             typeof password === "string" ? password : ""
         );
+        await refreshMqttConnection();
         res.status(201).json(saved);
     } catch (error) {
         logger.error(`[mqtt-broker]: Failed to save broker: ${error}`);
@@ -55,6 +57,7 @@ mqttBrokerRouter.delete("/:id", async (req: Request, res: Response) => {
 
     try {
         await deleteMqttBroker(id);
+        await refreshMqttConnection();
         res.sendStatus(204);
     } catch (error) {
         logger.error(`[mqtt-broker]: Failed to delete broker: ${error}`);

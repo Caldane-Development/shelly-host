@@ -35,6 +35,14 @@ section.mqtt-browser {
   background-color: #e5484d;
 }
 
+.connectedToBroker {
+  color: #30a46c;
+}
+
+.disconnectedBroker {
+  color: #e5484d;
+}
+
 .filter {
   padding: 0.5em 0.8em;
   border-radius: 8px;

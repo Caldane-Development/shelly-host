@@ -2,8 +2,17 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { mqttBrokers, devices } from "../db/schema";
 
+const normalizeBrokerServer = (server: string): string =>
+    server.replace(/^[a-z]+:\/\//i, "").replace(/\/+$/, "").trim().toLocaleLowerCase();
+
 export const getMqttBrokers = async () => {
     return db.select().from(mqttBrokers).orderBy(mqttBrokers.server);
+};
+
+export const getMqttBrokerByServer = async (server: string) => {
+    const brokers = await getMqttBrokers();
+    const normalized = normalizeBrokerServer(server);
+    return brokers.find((broker) => normalizeBrokerServer(broker.server) === normalized) ?? null;
 };
 
 // Distinct MQTT broker addresses discovered on devices (from their persisted

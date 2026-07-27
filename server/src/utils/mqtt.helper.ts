@@ -8,6 +8,7 @@ import { Device, IDevice } from "../../../common/models/device.interface";
 import { createIDevice } from "./device.helper";
 import { getSiteConfigCached } from "./site-config.helper";
 import { resolveBridgeTargets } from "./bridge.helper";
+import { getMqttBrokerByServer } from "./mqtt-broker.helper";
 
 export interface SubscriptionResponse {
     id: string;
@@ -45,31 +46,40 @@ export interface MqttMonitorMessage {
     timestamp: string;
 }
 
+export interface MqttMonitorStatus {
+    broker: string;
+    connected: boolean;
+}
+
 const monitors: Map<string, (message: MqttMonitorMessage) => void> = new Map();
+let client: mqttLibrary.MqttClient | null = null;
+let activeClientKey = "";
+let activeBrokerLabel = "";
+let mqttConnected = false;
 
-const client = mqttLibrary.connect(process.env.MQTT_URL as string);
-logger.info(`[server]: MQTT Server is running at ${process.env.MQTT_URL}`);
+const buildBrokerUrl = (server: string): string =>
+    /^[a-z]+:\/\//i.test(server) ? server : `mqtt://${server}`;
 
-client.on("connect", () => {
-    const siteName = getSiteConfigCached().name;
-    client.subscribe([`${siteName}.status/rpc`, `${siteName}.action/rpc`], (err) => {
-        if (err) {
-            logger.error(`[server]: Failed to subscribe to MQTT channel: ${err}`);
-        }
-        logger.info(`[server]: Subscribed to MQTT channel: ${siteName}`);
+const closeClient = async (mqttClient: mqttLibrary.MqttClient | null): Promise<void> => {
+    if (!mqttClient) {
+        return;
+    }
+    await new Promise<void>((resolve) => {
+        mqttClient.end(true, {}, () => resolve());
     });
+};
 
-    // Subscribe to all topics so the MQTT browser can monitor broker traffic
-    client.subscribe("#", (err) => {
+const subscribeMonitorTopics = (mqttClient: mqttLibrary.MqttClient, brokerLabel: string) => {
+    mqttClient.subscribe("#", (err) => {
         if (err) {
-            logger.error(`[server]: Failed to subscribe to monitor channel: ${err}`);
+            logger.error(`[server]: Failed to subscribe to monitor channel on ${brokerLabel}: ${err}`);
             return;
         }
-        logger.info(`[server]: Subscribed to monitor channel: #`);
+        logger.info(`[server]: Subscribed to MQTT monitor channel on ${brokerLabel}: #`);
     });
-});
+};
 
-client.on("message", (topic, message) => {
+const handleIncomingMessage = (topic: string, message: Buffer) => {
     // Forward every message to any active monitors before other processing
     if (monitors.size > 0) {
         const monitorMessage: MqttMonitorMessage = {
@@ -111,7 +121,7 @@ client.on("message", (topic, message) => {
                             method: "Switch.Set",
                             params: { id: target.channel, on: target.on },
                         });
-                        client.publish(`${target.topicPrefix}/rpc`, command);
+                        client?.publish(`${target.topicPrefix}/rpc`, command);
                         logger.request(
                             `[server]: Bridge mirrored ${frame.src} switch:${channel}=${output} -> ${target.targetName} (${target.topicPrefix})`
                         );
@@ -123,8 +133,6 @@ client.on("message", (topic, message) => {
         }
     }
 
-    const [topicSite, topicChannel] = topic.split(".");
-
     if (message.length === 0) {
         return;
     }
@@ -132,12 +140,14 @@ client.on("message", (topic, message) => {
         return;
     }
 
-    if(topicSite !== getSiteConfigCached().name) {
-        logger.error(`[server]: Invalid topic site: ${topicSite}`);
+    const [topicSite, ...topicChannelParts] = topic.split(".");
+    if (topicSite !== getSiteConfigCached().name) {
         return;
     }
 
-    if(topicChannel === "action/rpc") {
+    const topicChannel = topicChannelParts.join(".");
+
+    if (topicChannel === "action/rpc") {
         try {
             const parsedMessage = JSON.parse(message.toString());
             if (parsedMessage.src && typeof parsedMessage.src === "string") {
@@ -169,7 +179,96 @@ client.on("message", (topic, message) => {
             }
         });
     }
-});
+};
+
+const resolveBrokerConnection = async (): Promise<{
+    key: string;
+    url: string;
+    options: mqttLibrary.IClientOptions;
+    brokerLabel: string;
+} | null> => {
+    const configuredBroker = getSiteConfigCached().mqtt.trim();
+    const fallbackBroker = (process.env.MQTT_URL ?? "").trim();
+    const brokerLabel = configuredBroker || fallbackBroker;
+
+    if (!brokerLabel) {
+        return null;
+    }
+
+    const brokerUrl = buildBrokerUrl(brokerLabel);
+    const savedBroker = configuredBroker ? await getMqttBrokerByServer(configuredBroker) : null;
+    const options: mqttLibrary.IClientOptions = {};
+
+    if (savedBroker?.username) {
+        options.username = savedBroker.username;
+    }
+    if (savedBroker?.password) {
+        options.password = savedBroker.password;
+    }
+
+    return {
+        key: JSON.stringify({ url: brokerUrl, username: options.username ?? "", password: options.password ?? "" }),
+        url: brokerUrl,
+        options,
+        brokerLabel,
+    };
+};
+
+export const refreshMqttConnection = async (): Promise<void> => {
+    const nextConnection = await resolveBrokerConnection();
+
+    if (!nextConnection) {
+        await closeClient(client);
+        client = null;
+        activeClientKey = "";
+        activeBrokerLabel = "";
+        mqttConnected = false;
+        logger.warn("[server]: MQTT monitor disabled because no broker is configured");
+        return;
+    }
+
+    if (client && activeClientKey === nextConnection.key) {
+        return;
+    }
+
+    const previousClient = client;
+    client = null;
+    activeClientKey = nextConnection.key;
+    activeBrokerLabel = nextConnection.brokerLabel;
+    mqttConnected = false;
+    await closeClient(previousClient);
+
+    const nextClient = mqttLibrary.connect(nextConnection.url, nextConnection.options);
+    client = nextClient;
+    logger.info(`[server]: Connecting MQTT monitor to ${nextConnection.brokerLabel}`);
+
+    nextClient.on("connect", () => {
+        if (client !== nextClient) {
+            return;
+        }
+        mqttConnected = true;
+        logger.info(`[server]: MQTT monitor connected to ${nextConnection.brokerLabel}`);
+        subscribeMonitorTopics(nextClient, nextConnection.brokerLabel);
+    });
+
+    nextClient.on("error", (error) => {
+        if (client !== nextClient) {
+            return;
+        }
+        mqttConnected = false;
+        logger.error(`[server]: MQTT monitor error on ${nextConnection.brokerLabel}: ${error}`);
+    });
+
+    nextClient.on("close", () => {
+        if (client !== nextClient) {
+            return;
+        }
+        mqttConnected = false;
+        logger.warn(`[server]: MQTT monitor disconnected from ${nextConnection.brokerLabel}`);
+    });
+
+    nextClient.on("message", handleIncomingMessage);
+};
 
 export const mqttAddListener = (id: string, callback: (device: IDevice) => void) => {
     listeners.push(callback);
@@ -186,8 +285,17 @@ export const mqttRemoveMonitor = (id: string) => {
     logger.info(`[server]: Removed MQTT monitor: ${id}`);
 };
 
+export const getMqttMonitorStatus = (): MqttMonitorStatus => ({
+    broker: activeBrokerLabel,
+    connected: mqttConnected,
+});
+
 export const mqtt = {
     publish: (clientName: string, channel: string, message: string) => {
+        if (!client) {
+            logger.error(`[server]: MQTT publish skipped for ${clientName}; no broker connection is active`);
+            return;
+        }
         client.publish(`${channel}/rpc`, message);
         logger.request(`[server]: Client ${clientName} published message "${message}" to channel "${channel}"`);
     },
@@ -210,6 +318,11 @@ export const mqtt = {
         const roomKey = device.room_id.toString() as keyof typeof roomList.data.rooms;
         const room: Room = roomList.data.rooms[roomKey];
         const mqttConfig = createMqttConfig(device.name, room);
+
+        if (!client) {
+            logger.error(`[server]: MQTT status request skipped for ${device.name}; no broker connection is active`);
+            return;
+        }
 
         client.publish(`${mqttConfig.topic_prefix}/rpc`, JSON.stringify({ src: `${getSiteConfigCached().name}.status`, ...STATUS_MESSAGE, id: device.ip }));
         logger.request(`[server]: Client ${device.name} published [get status] to channel "${mqttConfig.topic_prefix}"`);

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { logger } from "../logger";
 import { getSiteConfig, saveSiteConfig } from "../utils/site-config.helper";
+import { refreshMqttConnection } from "../utils/mqtt.helper";
 import site from "../assets/json/site.json";
 
 export const siteConfigRouter = Router();
@@ -44,6 +45,7 @@ siteConfigRouter.put("/", async (req: Request, res: Response) => {
             ...(zip !== undefined ? { zip } : {}),
             ...(cloudAuthKey !== undefined ? { cloudAuthKey } : {}),
         });
+        await refreshMqttConnection();
         res.json({ ...saved, cloudAuthKey: maskCloudAuthKey(saved.cloudAuthKey) });
     } catch (error) {
         logger.error(`[site-config]: Failed to save site config: ${error}`);

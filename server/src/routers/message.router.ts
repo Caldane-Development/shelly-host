@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Request, Response } from "express";
 import { logger } from "../logger";
-import { createMqttConfig, mqtt, mqttAddMonitor, mqttRemoveMonitor } from "../utils/mqtt.helper";
+import { createMqttConfig, getMqttMonitorStatus, mqtt, mqttAddMonitor, mqttRemoveMonitor } from "../utils/mqtt.helper";
 import { channelDictionary } from "../utils/channel.helper";
 import roomList from "../assets/json/room-list.json";
 
@@ -28,6 +28,10 @@ messageRouter.get("/monitor", (req: Request, res: Response) => {
         mqttRemoveMonitor(monitorId);
         logger.info(`[server]: MQTT monitor disconnected: ${monitorId}`);
     });
+});
+
+messageRouter.get("/monitor/status", (_req: Request, res: Response) => {
+    res.json(getMqttMonitorStatus());
 });
 
 messageRouter.post("/client/:clientName", (req: Request, res: Response) => {
