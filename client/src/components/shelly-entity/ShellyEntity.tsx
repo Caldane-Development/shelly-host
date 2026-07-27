@@ -25,6 +25,12 @@ interface WifiCredential {
     password: string;
 }
 
+interface GroupOption {
+    id: number;
+    name: string;
+    controllerDeviceId: string | null;
+}
+
 const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     alert(`**Copied to clipboard**\n${label}:\n${text}`);
@@ -53,6 +59,13 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
     const [selSsid, setSelSsid] = useState("");
     const [wifiDialogError, setWifiDialogError] = useState("");
     const [wifiSubmitting, setWifiSubmitting] = useState(false);
+
+    // Group-controller dialog state
+    const [showGroupDialog, setShowGroupDialog] = useState(false);
+    const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+    const [selGroup, setSelGroup] = useState<string>("");
+    const [groupDialogError, setGroupDialogError] = useState("");
+    const [groupSubmitting, setGroupSubmitting] = useState(false);
 
     useEffect(() => {
         setDeviceEntity(device);
@@ -248,6 +261,66 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
         }
     };
 
+    // Assign this device as the controller of a switch group. A physical event
+    // on the device (button toggle) then triggers the whole group. The backend
+    // installs the on/off webhooks on the device.
+    const openGroupDialog = async () => {
+        setGroupDialogError("");
+        setShowGroupDialog(true);
+        try {
+            const response = await fetch(`${BACKEND_URL}/group`);
+            const groups: GroupOption[] = response.ok ? await response.json() : [];
+            setGroupOptions(groups);
+            // Preselect a group this device already controls, if any.
+            const deviceId = deviceEntity.device?.id?.toString() ?? "";
+            const owned = groups.find((g) => g.controllerDeviceId === deviceId);
+            setSelGroup(owned ? String(owned.id) : groups[0] ? String(groups[0].id) : "");
+        } catch (err) {
+            console.error("Failed to load groups", err);
+            setGroupDialogError("Could not load switch groups from the server.");
+        }
+    };
+
+    const closeGroupDialog = () => {
+        setShowGroupDialog(false);
+        setGroupDialogError("");
+    };
+
+    const submitGroupController = async () => {
+        if (selGroup === "") {
+            setGroupDialogError("Choose a switch group.");
+            return;
+        }
+        const deviceId = deviceEntity.device?.id?.toString();
+        if (!deviceId) {
+            setGroupDialogError("This device has no id; re-run the scanner first.");
+            return;
+        }
+
+        setGroupSubmitting(true);
+        setGroupDialogError("");
+        try {
+            const response = await fetch(`${BACKEND_URL}/group/${selGroup}/controller`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deviceId }),
+            });
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}`);
+            }
+            closeGroupDialog();
+            const groupName = groupOptions.find((g) => String(g.id) === selGroup)?.name ?? selGroup;
+            alert(`${deviceEntity.name} is now the controller for "${groupName}".`);
+        } catch (err) {
+            console.error("Failed to assign group controller", err);
+            setGroupDialogError(
+                "Could not assign this device as controller. Make sure it was picked up by a recent scan."
+            );
+        } finally {
+            setGroupSubmitting(false);
+        }
+    };
+
     // Toggle the switch over MQTT by publishing to the device's topic prefix.
     // Devices that share a topic (e.g. a 3-way pairing) all react to the same
     // message, so this drives the whole logical switch rather than one relay.
@@ -324,6 +397,15 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
                 {mode === "normal" && (
                     <button className={style["change-wifi"]} onClick={openWifiDialog} title="Change WiFi network">
                         <FontAwesomeIcon icon={faWifi} /> Change WiFi
+                    </button>
+                )}
+                {mode === "normal" && (
+                    <button
+                        className={style["change-wifi"]}
+                        onClick={openGroupDialog}
+                        title="Assign this device as a switch-group controller"
+                    >
+                        <FontAwesomeIcon icon={faObjectGroup} /> Group Controller
                     </button>
                 )}
             </p>
@@ -543,6 +625,64 @@ const ShellyEntity = ({ device, mode }: { device: IDevice; mode: string }) => {
                                 disabled={wifiSubmitting || wifiCredentials.length === 0}
                             >
                                 {wifiSubmitting ? "Sending…" : "Change WiFi"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showGroupDialog && (
+                <div className={style["dialog-overlay"]} onClick={closeGroupDialog}>
+                    <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
+                        <div className={style["dialog-header"]}>
+                            <h4>Group Controller — {deviceEntity.name}</h4>
+                            <button className={style["dialog-close"]} onClick={closeGroupDialog} aria-label="Close">
+                                <FontAwesomeIcon icon={faXmark} />
+                            </button>
+                        </div>
+
+                        <p className={style["dialog-note"]}>
+                            A physical event on <b>{deviceEntity.name}</b> will toggle the selected switch group.
+                            The device's on/off webhooks are installed automatically.
+                        </p>
+
+                        <label className={style["dialog-field"]}>
+                            <span>Switch Group</span>
+                            <select
+                                value={selGroup}
+                                onChange={(e) => {
+                                    setSelGroup(e.target.value);
+                                    if (groupDialogError) setGroupDialogError("");
+                                }}
+                            >
+                                {groupOptions.length === 0 ? (
+                                    <option value="">No switch groups</option>
+                                ) : (
+                                    groupOptions.map((group) => (
+                                        <option key={group.id} value={String(group.id)}>
+                                            {group.name}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </label>
+
+                        {groupOptions.length === 0 && (
+                            <p className={style["dialog-note"]}>Create a switch group first on the Switch Groups page.</p>
+                        )}
+
+                        {groupDialogError && <p className={style.error}>{groupDialogError}</p>}
+
+                        <div className={style["dialog-actions"]}>
+                            <button type="button" className={style["dialog-cancel"]} onClick={closeGroupDialog} disabled={groupSubmitting}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className={style["dialog-submit"]}
+                                onClick={submitGroupController}
+                                disabled={groupSubmitting || groupOptions.length === 0}
+                            >
+                                {groupSubmitting ? "Assigning…" : "Set as Controller"}
                             </button>
                         </div>
                     </div>

@@ -36,6 +36,7 @@ const emptyDraft = () => ({
     roomId: "" as number | "",
     tieBreak: "on",
     memberIds: [] as string[],
+    controllerId: "" as string,
 });
 
 const Groups = () => {
@@ -83,6 +84,7 @@ const Groups = () => {
             roomId: group.roomId ?? "",
             tieBreak: group.tieBreak,
             memberIds: group.members.map((m) => m.deviceId),
+            controllerId: group.controllerDeviceId ?? "",
         });
         setEditingId(group.id);
     };
@@ -137,6 +139,26 @@ const Groups = () => {
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
+            const saved: SwitchGroup = await response.json();
+
+            // If a controller device was chosen (and it changed), install the
+            // trigger webhooks on it via the dedicated endpoint. A device event
+            // then toggles the whole group.
+            const originalController =
+                editingId === "new"
+                    ? null
+                    : groups.find((g) => g.id === editingId)?.controllerDeviceId ?? null;
+            if (draft.controllerId !== "" && draft.controllerId !== originalController) {
+                const ctrlRes = await fetch(`${BACKEND_URL}/group/${saved.id}/controller`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ deviceId: draft.controllerId }),
+                });
+                if (!ctrlRes.ok) {
+                    throw new Error(`Failed to assign controller device: ${ctrlRes.status}`);
+                }
+            }
+
             await loadAll();
             cancelEdit();
         } catch (err) {
@@ -235,6 +257,23 @@ const Groups = () => {
                         </select>
                     </label>
 
+                    <label className={style.field}>
+                        <span>Controller device (its button event toggles this group)</span>
+                        <select
+                            value={draft.controllerId}
+                            onChange={(e) =>
+                                setDraft((prev) => ({ ...prev, controllerId: e.target.value }))
+                            }
+                        >
+                            <option value="">None</option>
+                            {devices.map((device) => (
+                                <option key={device.id} value={device.id}>
+                                    {device.name} ({roomName(device.roomId)})
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
                     <div className={style.members}>
                         <span className={style["members-title"]}>Members</span>
                         <div className={style["members-list"]}>
@@ -275,6 +314,9 @@ const Groups = () => {
                             <span className={style.meta}>Room: {roomName(group.roomId)}</span>
                             <span className={style.meta}>
                                 Tie-break: all {group.tieBreak === "off" ? "OFF" : "ON"}
+                            </span>
+                            <span className={style.meta}>
+                                Controller: {group.controllerDeviceId ? deviceName(group.controllerDeviceId) : "—"}
                             </span>
                             <ul className={style["member-tags"]}>
                                 {group.members.map((member) => (
