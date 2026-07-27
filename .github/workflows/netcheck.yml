@@ -1,0 +1,10 @@
+name: NetCheck
+on:
+  workflow_dispatch:
+jobs:
+  chk:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Probe proxy on prod host
+        run: |
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=no -i ~/.ssh/github_runner_key github-runner@10.10.10.28 'echo "=== host listeners on 4501/4500 ==="; ss -ltnp 2>/dev/null | grep -E ":4501|:4500" || sudo ss -ltnp 2>/dev/null | grep -E ":4501|:4500" || echo "(ss needs root)"; echo -n "localhost:4501 / -> "; curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4501/ ; echo -n "localhost:4501 /api/mqtt-broker -> "; curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4501/api/mqtt-broker ; echo -n "10.10.10.28:4501 / -> "; curl -s -o /dev/null -w "%{http_code}\n" http://10.10.10.28:4501/ ; echo -n "localhost:4500/health -> "; curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4500/health'
