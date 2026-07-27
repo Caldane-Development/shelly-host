@@ -35,6 +35,12 @@ const SiteConfigs = () => {
     const [siteLoading, setSiteLoading] = useState(true);
     const [siteError, setSiteError] = useState("");
     const [siteSaved, setSiteSaved] = useState(false);
+    // Shelly cloud auth key. The server returns only a masked hint (e.g. ****6668);
+    // the input stays empty and we only send a new value when the user types one,
+    // so saving other fields never overwrites the stored key with the mask.
+    const [siteCloudKey, setSiteCloudKey] = useState("");
+    const [siteCloudKeyHint, setSiteCloudKeyHint] = useState("");
+    const [showCloudKey, setShowCloudKey] = useState(false);
 
     // MQTT broker state
     const [brokers, setBrokers] = useState<MqttBroker[]>([]);
@@ -119,9 +125,10 @@ const SiteConfigs = () => {
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            const data: { name: string; mqtt: string } = await response.json();
+            const data: { name: string; mqtt: string; cloudAuthKey?: string } = await response.json();
             setSiteName(data.name ?? "");
             setSiteMqtt(data.mqtt ?? "");
+            setSiteCloudKeyHint(data.cloudAuthKey ?? "");
         } catch (err) {
             console.error("Failed to fetch site config", err);
             setSiteError("Could not load site config from the server.");
@@ -140,17 +147,26 @@ const SiteConfigs = () => {
         }
 
         try {
+            const trimmedCloudKey = siteCloudKey.trim();
             const response = await fetch(`${BACKEND_URL}/site-config`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: trimmedName, mqtt: siteMqtt.trim() }),
+                body: JSON.stringify({
+                    name: trimmedName,
+                    mqtt: siteMqtt.trim(),
+                    // Only send the key when the user actually entered one, so we
+                    // never persist the masked hint back over the real key.
+                    ...(trimmedCloudKey !== "" ? { cloudAuthKey: trimmedCloudKey } : {}),
+                }),
             });
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            const data: { name: string; mqtt: string } = await response.json();
+            const data: { name: string; mqtt: string; cloudAuthKey?: string } = await response.json();
             setSiteName(data.name ?? "");
             setSiteMqtt(data.mqtt ?? "");
+            setSiteCloudKeyHint(data.cloudAuthKey ?? "");
+            setSiteCloudKey("");
             setSiteError("");
             setSiteSaved(true);
             setTimeout(() => setSiteSaved(false), 2000);
@@ -345,6 +361,26 @@ const SiteConfigs = () => {
                                 <option value={siteMqtt}>{siteMqtt}</option>
                             )}
                         </select>
+                        <div className={style["password-field"]}>
+                            <input
+                                type={showCloudKey ? "text" : "password"}
+                                placeholder={siteCloudKeyHint ? `Shelly cloud key (current: ${siteCloudKeyHint})` : "Shelly cloud auth key"}
+                                value={siteCloudKey}
+                                onChange={(e) => {
+                                    setSiteCloudKey(e.target.value);
+                                    if (siteError) setSiteError("");
+                                }}
+                                autoComplete="off"
+                            />
+                            <button
+                                type="button"
+                                className={style["toggle-visibility"]}
+                                onClick={() => setShowCloudKey((v) => !v)}
+                                aria-label={showCloudKey ? "Hide cloud key" : "Show cloud key"}
+                            >
+                                <FontAwesomeIcon icon={showCloudKey ? faEyeSlash : faEye} />
+                            </button>
+                        </div>
                         <button type="submit">
                             <FontAwesomeIcon icon={faPlus} /> Save Site
                         </button>

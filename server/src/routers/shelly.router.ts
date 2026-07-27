@@ -5,13 +5,14 @@ import roomList from "../assets/json/room-list.json";
 import config from "../assets/json/config.json";
 import { logger } from "../logger";
 import os from "os";
-import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyGetMqttSettings, shellyReboot, shellySetWifi, shellyWebhookList } from "../utils/discovery.helper";
+import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyCloudDevices, shellyCloudRooms, shellyGetMqttSettings, shellyReboot, shellySetWifi, shellyWebhookList } from "../utils/discovery.helper";
 import { MqttResponse } from "../../../common/models/mqtt.interface";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
 import { mqttAddListener, mqtt as mqttClient } from "../utils/mqtt.helper";
 import { getStoredDevices, getStoredIDevices, getEnabledDevices, saveDiscoveredDevices } from "../utils/device.helper";
 import { getStoredRooms, saveDiscoveredRooms } from "../utils/room.helper";
 import { getWifiCredentialBySsid } from "../utils/wifi.helper";
+import { getSiteConfigCached } from "../utils/site-config.helper";
 
 export const shellyRouter = Router();
 
@@ -43,6 +44,45 @@ if (!localIpAddress) {
     console.log("Could not find local IP address");
 }
 
+// Live Shelly-cloud device/room catalog with a short in-memory cache so an
+// "All ranges" scan (sequential per-subnet requests) doesn't re-hit the cloud
+// API for every range. Falls back to the bundled static snapshot when no cloud
+// auth key is configured or the cloud is unreachable (e.g. offline).
+interface DeviceCatalog {
+    devices: DeviceList;
+    rooms: typeof roomList;
+}
+
+const CATALOG_TTL_MS = 5 * 60_000;
+let catalogCache: { data: DeviceCatalog; expires: number } | null = null;
+
+const resolveDeviceCatalog = async (): Promise<DeviceCatalog> => {
+    const staticCatalog: DeviceCatalog = { devices: deviceList as DeviceList, rooms: roomList };
+
+    if (!getSiteConfigCached().cloudAuthKey) {
+        logger.info("[server]: No Shelly cloud auth key set; using bundled device/room snapshot");
+        return staticCatalog;
+    }
+
+    if (catalogCache && catalogCache.expires > Date.now()) {
+        return catalogCache.data;
+    }
+
+    try {
+        const [cloudRooms, cloudDevices] = await Promise.all([shellyCloudRooms(), shellyCloudDevices()]);
+        const resolved: DeviceCatalog = {
+            devices: cloudDevices?.isok && cloudDevices?.data?.devices ? (cloudDevices as DeviceList) : staticCatalog.devices,
+            rooms: cloudRooms?.isok && cloudRooms?.data?.rooms ? cloudRooms : staticCatalog.rooms,
+        };
+        catalogCache = { data: resolved, expires: Date.now() + CATALOG_TTL_MS };
+        logger.info("[server]: Loaded live Shelly cloud device/room catalog");
+        return resolved;
+    } catch (error: Error | any) {
+        logger.warn(`[server]: Shelly cloud fetch failed, using bundled snapshot. Error: ${error?.message}`);
+        return staticCatalog;
+    }
+};
+
 shellyRouter.get("/listen", async (_: Request, res: Response) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -65,11 +105,9 @@ shellyRouter.get("/discover", async (req: Request, res: Response) => {
         return;
     }
     const [net1, net2, net3] = ipAddress.split(".");
-    // const shellyRooms = await shellyCloudRooms();
-    // await new Promise((resolve) => setTimeout(resolve, 5000)); // Adding a delay to ensure the cloud rooms are fetched before discovering devices
-    // const shellyDevices = await shellyCloudDevices();
-    const shellyRooms = roomList;
-    const shellyDevices: DeviceList = deviceList;
+    const catalog = await resolveDeviceCatalog();
+    const shellyRooms = catalog.rooms;
+    const shellyDevices: DeviceList = catalog.devices;
     const discoveredDevices: Promise<IDevice | null>[] = []; // Array to hold discovered devices for logging
     const counts = { successfulResponses: 0, completedRequests: 0, totalIPs: config.discover.dhcp.end - config.discover.dhcp.start };
 
