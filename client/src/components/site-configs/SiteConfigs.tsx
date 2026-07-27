@@ -23,6 +23,14 @@ interface WifiCredential {
     password: string;
 }
 
+interface ReapplyMqttResult {
+    broker: string;
+    total: number;
+    succeeded: number;
+    failed: number;
+    failures: Array<{ ip: string; name: string; reason: string }>;
+}
+
 const SiteConfigs = () => {
     const dispatch = useDispatch();
     const networks = useSelector((state: RootState) => state.scanner.networks);
@@ -43,6 +51,9 @@ const SiteConfigs = () => {
     const [siteCloudKey, setSiteCloudKey] = useState("");
     const [siteCloudKeyHint, setSiteCloudKeyHint] = useState("");
     const [showCloudKey, setShowCloudKey] = useState(false);
+    const [reapplyingMqtt, setReapplyingMqtt] = useState(false);
+    const [reapplyMessage, setReapplyMessage] = useState("");
+    const [reapplyError, setReapplyError] = useState("");
 
     // MQTT broker state
     const [brokers, setBrokers] = useState<MqttBroker[]>([]);
@@ -328,6 +339,50 @@ const SiteConfigs = () => {
         setRevealed((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
+    const handleReapplyMqttToAllDevices = async () => {
+        if (siteMqtt.trim() === "") {
+            setReapplyError("Set and save a site MQTT broker first.");
+            setReapplyMessage("");
+            return;
+        }
+
+        setReapplyingMqtt(true);
+        setReapplyError("");
+        setReapplyMessage("");
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/devices/mqtt/reapply`, {
+                method: "POST",
+            });
+            const data = (await response.json()) as ReapplyMqttResult | { error?: string };
+
+            if (!response.ok) {
+                throw new Error((data as { error?: string }).error || `Request failed: ${response.status}`);
+            }
+
+            const result = data as ReapplyMqttResult;
+            const failuresPreview = result.failures
+                .slice(0, 3)
+                .map((failure) => `${failure.name} (${failure.ip || "no-ip"}): ${failure.reason}`)
+                .join("; ");
+
+            setReapplyMessage(
+                result.failed > 0
+                    ? `Updated ${result.succeeded}/${result.total} devices for broker ${result.broker}. ${result.failed} failed.${failuresPreview ? ` ${failuresPreview}` : ""}`
+                    : `Updated ${result.succeeded}/${result.total} devices for broker ${result.broker}.`
+            );
+
+            if (result.failed > 0) {
+                setReapplyError(`${result.failed} device(s) failed to update.`);
+            }
+        } catch (err) {
+            console.error("Failed to reapply MQTT settings", err);
+            setReapplyError(err instanceof Error ? err.message : "Could not reapply MQTT settings.");
+        } finally {
+            setReapplyingMqtt(false);
+        }
+    };
+
     const savedServers = new Set(brokers.map((broker) => broker.server));
 
     return (
@@ -398,10 +453,19 @@ const SiteConfigs = () => {
                         <button type="submit">
                             <FontAwesomeIcon icon={faPlus} /> Save Site
                         </button>
+                        <button
+                            type="button"
+                            onClick={handleReapplyMqttToAllDevices}
+                            disabled={reapplyingMqtt}
+                        >
+                            {reapplyingMqtt ? "Updating Devices…" : "Update All Devices To Current Broker"}
+                        </button>
                     </form>
                 )}
                 {siteSaved && <p className={style["network-name"]}>Saved.</p>}
                 {siteError && <p className={style.error}>{siteError}</p>}
+                {reapplyMessage && <p className={style["broker-meta"]}>{reapplyMessage}</p>}
+                {reapplyError && <p className={style.error}>{reapplyError}</p>}
             </div>
 
             <div className={style.panel}>

@@ -214,6 +214,70 @@ shellyRouter.get("/devices/status", async (_: Request, res: Response) => {
     }
 });
 
+shellyRouter.post("/devices/mqtt/reapply", async (_: Request, res: Response) => {
+    const broker = getSiteConfigCached().mqtt.trim();
+    if (!broker) {
+        res.status(400).json({ error: "Site MQTT broker is not configured." });
+        return;
+    }
+
+    try {
+        const storedDevices = await getStoredIDevices();
+        const mqttEnabledDevices = storedDevices.filter((device) => Boolean(device.mqtt?.enable));
+
+        if (mqttEnabledDevices.length === 0) {
+            res.json({
+                broker,
+                total: 0,
+                succeeded: 0,
+                failed: 0,
+                failures: [] as { ip: string; name: string; reason: string }[],
+            });
+            return;
+        }
+
+        const failures: { ip: string; name: string; reason: string }[] = [];
+        let succeeded = 0;
+
+        for (const device of mqttEnabledDevices) {
+            try {
+                if (!device.ip) {
+                    failures.push({ ip: "", name: device.name || "(unknown)", reason: "Missing device IP" });
+                    continue;
+                }
+
+                const updated = await shellyActivateMqtt(device.ip, device, { server: broker });
+                if (!updated) {
+                    failures.push({ ip: device.ip, name: device.name || "(unknown)", reason: "MQTT.SetConfig failed" });
+                    continue;
+                }
+
+                await shellyReboot(device.ip);
+                await saveDiscoveredDevices([updated]);
+                mqttClient.status(updated.device);
+                succeeded++;
+            } catch (error: Error | any) {
+                failures.push({
+                    ip: device.ip || "",
+                    name: device.name || "(unknown)",
+                    reason: error?.message || "Unknown error",
+                });
+            }
+        }
+
+        res.json({
+            broker,
+            total: mqttEnabledDevices.length,
+            succeeded,
+            failed: failures.length,
+            failures,
+        });
+    } catch (error) {
+        logger.error(`[server]: Failed to reapply MQTT config to all devices: ${error}`);
+        res.status(500).json({ error: "Failed to reapply MQTT config to all devices" });
+    }
+});
+
 shellyRouter.post("/:ip/mqtt", async (req: Request, res: Response) => {
     logger.info(`[server]: Activating MQTT for device with IP: ${req.params.ip}`);
     const ip = req.params.ip;
