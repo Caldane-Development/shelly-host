@@ -213,6 +213,19 @@ button.dialog-close {
     opacity: 0.6;
 }
 
+.dialog-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.dialog-check input {
+    margin-top: 0.15rem;
+}
+
 .dialog-toggle {
     display: flex;
     gap: 0;

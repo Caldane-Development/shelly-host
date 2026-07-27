@@ -1,4 +1,4 @@
-import { faCloudArrowUp, faCopy, faMessage, faObjectGroup, faPowerOff, faTowerBroadcast, faWifi, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCloudArrowUp, faCopy, faLink, faMessage, faObjectGroup, faPowerOff, faTowerBroadcast, faWifi, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { IDevice } from "../../../../common/models/device.interface";
@@ -85,6 +85,25 @@ const ShellyEntity = ({
     const [selInput, setSelInput] = useState<string>("0");
     const [groupDialogError, setGroupDialogError] = useState("");
     const [groupSubmitting, setGroupSubmitting] = useState(false);
+
+    // Companion (3-way) dialog state
+    const [showCompanionDialog, setShowCompanionDialog] = useState(false);
+    const [companionDevices, setCompanionDevices] = useState<IDevice[]>([]);
+    const [selCompRoom, setSelCompRoom] = useState<string>("");
+    const [selCompTarget, setSelCompTarget] = useState<string>("");
+    const [selCompInput, setSelCompInput] = useState<string>("0");
+    const [detachLocal, setDetachLocal] = useState(true);
+    const [companionError, setCompanionError] = useState("");
+    const [companionSubmitting, setCompanionSubmitting] = useState(false);
+
+    // Number of physical inputs on this device: input-only devices (i4) expose
+    // channels_count inputs; relay devices are treated as a single input.
+    const inputCount =
+        deviceEntity.device?.category === "inputs_reader"
+            ? Math.max(1, Number(deviceEntity.device?.channels_count) || 1)
+            : 1;
+    // Only relay devices have a local relay worth detaching.
+    const hasLocalRelay = deviceEntity.device?.category !== "inputs_reader";
 
     useEffect(() => {
         setDeviceEntity(device);
@@ -341,7 +360,72 @@ const ShellyEntity = ({
         }
     };
 
-    // Toggle the switch over MQTT by publishing to the device's topic prefix.
+    const openCompanionDialog = async () => {
+        setCompanionError("");
+        setDetachLocal(hasLocalRelay);
+        setSelCompInput("0");
+        setShowCompanionDialog(true);
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/devices/detailed`);
+            const devices: IDevice[] = response.ok ? await response.json() : [];
+            // Exclude this device from the target list.
+            const targets = devices.filter((d) => d.ip && d.ip !== deviceEntity.ip);
+            setCompanionDevices(targets);
+            const firstRoom = targets.find((d) => d.room?.name)?.room?.name ?? "";
+            setSelCompRoom(firstRoom);
+            const firstTarget = targets.find((d) => (d.room?.name ?? "") === firstRoom);
+            setSelCompTarget(firstTarget?.ip ?? "");
+        } catch (err) {
+            console.error("Failed to load devices", err);
+            setCompanionError("Could not load devices from the server.");
+        }
+    };
+
+    const closeCompanionDialog = () => {
+        setShowCompanionDialog(false);
+        setCompanionError("");
+    };
+
+    const submitCompanion = async () => {
+        if (selCompTarget === "") {
+            setCompanionError("Choose a target device.");
+            return;
+        }
+        setCompanionSubmitting(true);
+        setCompanionError("");
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/${deviceEntity.ip}/companion`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    targetIp: selCompTarget,
+                    inputId: Number(selCompInput),
+                    detach: detachLocal,
+                }),
+            });
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}`);
+            }
+            const targetName =
+                companionDevices.find((d) => d.ip === selCompTarget)?.name ?? selCompTarget;
+            closeCompanionDialog();
+            alert(`${deviceEntity.name} (input ${selCompInput}) now toggles "${targetName}".`);
+        } catch (err) {
+            console.error("Failed to link companion switch", err);
+            setCompanionError(
+                "Could not link the companion switch. Make sure both devices are online and reachable."
+            );
+        } finally {
+            setCompanionSubmitting(false);
+        }
+    };
+
+    // Distinct room names for the target cascading dropdown.
+    const companionRooms = Array.from(
+        new Set(companionDevices.map((d) => d.room?.name).filter((n): n is string => Boolean(n)))
+    );
+    const companionTargets = companionDevices.filter((d) => (d.room?.name ?? "") === selCompRoom);
+
     // Devices that share a topic (e.g. a 3-way pairing) all react to the same
     // message, so this drives the whole logical switch rather than one relay.
     const togglePower = async (device: IDevice) => {
@@ -474,6 +558,15 @@ const ShellyEntity = ({
                         title="Assign this device as a switch-group controller"
                     >
                         <FontAwesomeIcon icon={faObjectGroup} />
+                    </button>
+                )}
+                {mode === "normal" && (
+                    <button
+                        className={style["change-wifi"]}
+                        onClick={openCompanionDialog}
+                        title="Make this a 3-way / companion switch for another device"
+                    >
+                        <FontAwesomeIcon icon={faLink} />
                     </button>
                 )}
             </p>
@@ -765,6 +858,111 @@ const ShellyEntity = ({
                                 disabled={groupSubmitting || groupOptions.length === 0}
                             >
                                 {groupSubmitting ? "Assigning…" : "Set as Controller"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showCompanionDialog && (
+                <div className={style["dialog-overlay"]} onClick={closeCompanionDialog}>
+                    <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
+                        <div className={style["dialog-header"]}>
+                            <h4>3-Way / Companion — {deviceEntity.name}</h4>
+                            <button className={style["dialog-close"]} onClick={closeCompanionDialog} aria-label="Close">
+                                <FontAwesomeIcon icon={faXmark} />
+                            </button>
+                        </div>
+
+                        <p className={style["dialog-note"]}>
+                            Flipping <b>{deviceEntity.name}</b> will toggle the light on the target device below.
+                            Pick the room, then the device that has the actual load.
+                        </p>
+
+                        <label className={style["dialog-field"]}>
+                            <span>Room</span>
+                            <select
+                                value={selCompRoom}
+                                onChange={(e) => {
+                                    const room = e.target.value;
+                                    setSelCompRoom(room);
+                                    const first = companionDevices.find((d) => (d.room?.name ?? "") === room);
+                                    setSelCompTarget(first?.ip ?? "");
+                                    if (companionError) setCompanionError("");
+                                }}
+                            >
+                                {companionRooms.length === 0 ? (
+                                    <option value="">No devices found</option>
+                                ) : (
+                                    companionRooms.map((room) => (
+                                        <option key={room} value={room}>
+                                            {room}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </label>
+
+                        <label className={style["dialog-field"]}>
+                            <span>Target Device</span>
+                            <select
+                                value={selCompTarget}
+                                onChange={(e) => {
+                                    setSelCompTarget(e.target.value);
+                                    if (companionError) setCompanionError("");
+                                }}
+                            >
+                                {companionTargets.length === 0 ? (
+                                    <option value="">No devices in this room</option>
+                                ) : (
+                                    companionTargets.map((d) => (
+                                        <option key={d.ip} value={d.ip}>
+                                            {d.name} ({d.ip})
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </label>
+
+                        {inputCount > 1 && (
+                            <label className={style["dialog-field"]}>
+                                <span>Companion Input</span>
+                                <select
+                                    value={selCompInput}
+                                    onChange={(e) => setSelCompInput(e.target.value)}
+                                >
+                                    {Array.from({ length: inputCount }, (_, n) => (
+                                        <option key={n} value={String(n)}>
+                                            Input {n}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        )}
+
+                        {hasLocalRelay && (
+                            <label className={style["dialog-check"]}>
+                                <input
+                                    type="checkbox"
+                                    checked={detachLocal}
+                                    onChange={(e) => setDetachLocal(e.target.checked)}
+                                />
+                                <span>Detach this device's own relay (recommended for a dedicated companion)</span>
+                            </label>
+                        )}
+
+                        {companionError && <p className={style.error}>{companionError}</p>}
+
+                        <div className={style["dialog-actions"]}>
+                            <button type="button" className={style["dialog-cancel"]} onClick={closeCompanionDialog} disabled={companionSubmitting}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className={style["dialog-submit"]}
+                                onClick={submitCompanion}
+                                disabled={companionSubmitting || selCompTarget === ""}
+                            >
+                                {companionSubmitting ? "Linking…" : "Link Companion"}
                             </button>
                         </div>
                     </div>

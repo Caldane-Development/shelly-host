@@ -8,7 +8,7 @@ import { MqttResult } from "../../../common/models/mqtt.interface";
 import { ShellyStatus, ShellyStatusResult } from "../../../common/models/shelly.interface";
 import { createMqttConfig } from "./mqtt.helper";
 import { Webhooks } from "../../../common/models/webhooks.interface";
-import { createWebhookConfig, createGroupWebhookConfig } from "./webhook.helper";
+import { createWebhookConfig, createGroupWebhookConfig, createCompanionWebhookConfig } from "./webhook.helper";
 import { getSiteConfigCached } from "./site-config.helper";
 
 
@@ -461,6 +461,94 @@ export const shellyActivateGroupWebhook = async (ip: string, groupId: number, mo
         return { ip: ip, ...postResponse };
     } catch (error: Error | any) {
         logger.info(`[server]: Failed to activate group webhook on device at ${ip}. Error: ${error.message}`);
+    }
+
+    return null;
+}
+
+// Remove any previously-installed companion (3-way) toggle webhooks on a device
+// so re-linking stays idempotent instead of stacking duplicate hooks.
+export const shellyDeleteCompanionWebhooks = async (ip: string, targetIp: string): Promise<void> => {
+    const headers = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "ShellyApp/1.0",
+    };
+    try {
+        const list = await postRequest<{ result?: { hooks?: { id: number; urls?: string[] }[] } }>(
+            `http://${ip}/rpc/`,
+            headers,
+            { id: 0, method: "Webhook.List" }
+        );
+        const hooks = list?.result?.hooks ?? [];
+        const marker = `//${targetIp}/rpc/Switch.Toggle`;
+        for (const hook of hooks) {
+            if ((hook.urls ?? []).some((url) => url.includes(marker))) {
+                await postRequest(`http://${ip}/rpc/`, headers, {
+                    id: 0,
+                    method: "Webhook.Delete",
+                    params: { id: hook.id },
+                });
+            }
+        }
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to clear companion webhooks on device at ${ip}. Error: ${error.message}`);
+    }
+};
+
+// Detach a relay device's input so a physical flip stops driving its own relay
+// (it becomes a pure companion switch). Best-effort: input-only devices (i4)
+// have no Switch component and this simply no-ops.
+export const shellyDetachInput = async (ip: string, switchId: number = 0): Promise<void> => {
+    const headers = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "ShellyApp/1.0",
+    };
+    try {
+        await postRequest(`http://${ip}/rpc/`, headers, {
+            id: 0,
+            method: "Switch.SetConfig",
+            // initial_state must not be `match_input` when detached (invalid combo).
+            params: { id: switchId, config: { in_mode: "detached", initial_state: "restore_last" } },
+        });
+    } catch (error: Error | any) {
+        logger.info(`[server]: Could not detach input on device at ${ip} (may be input-only). Error: ${error.message}`);
+    }
+};
+
+// Install a companion (3-way) toggle webhook: a physical toggle edge on `ip`
+// input `inputId` toggles the relay on `targetIp` channel `targetChannel`.
+export const shellyActivateCompanionWebhook = async (
+    ip: string,
+    targetIp: string,
+    targetChannel: number,
+    mode: "on" | "off",
+    inputId: number = 0
+): Promise<any> => {
+    const options = {
+        body: {
+            id: 0,
+            method: "Webhook.Create",
+            params: createCompanionWebhookConfig(targetIp, targetChannel, mode, inputId),
+        },
+    };
+
+    try {
+        const postResponse = await postRequest<{}>(
+            `http://${ip}/rpc/`,
+            {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
+                Accept: "application/json",
+                "User-Agent": "ShellyApp/1.0",
+                Connection: "keep-alive",
+            },
+            options.body
+        );
+        return { ip: ip, ...postResponse };
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to activate companion webhook on device at ${ip}. Error: ${error.message}`);
     }
 
     return null;

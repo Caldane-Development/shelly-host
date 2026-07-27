@@ -66,3 +66,32 @@ export const createGroupWebhookConfig = (groupId: number, mode: "on" | "off", in
         "repeat_period": 0
     };
 };
+
+// Webhook that makes a companion (3-way) switch toggle the relay on ANOTHER
+// device. Each physical toggle edge calls the target device's Switch.Toggle
+// directly, so one flip = one toggle regardless of the switch position.
+export const createCompanionWebhookConfig = (
+    targetIp: string,
+    targetChannel: number,
+    mode: "on" | "off",
+    inputId: number = 0
+): Hook => {
+    const hookMap = {
+        "on": { id: 1, event: "input.toggle_on", name: `Companion ${inputId} -> ${targetIp}` },
+        "off": { id: 2, event: "input.toggle_off", name: `Companion ${inputId} -> ${targetIp}` },
+    };
+
+    return {
+        "id": hookMap[mode].id,
+        "cid": inputId,
+        "enable": true,
+        "event": hookMap[mode].event,
+        "name": hookMap[mode].name,
+        "ssl_ca": "ca.pem",
+        "urls": [
+            `http://${targetIp}/rpc/Switch.Toggle?id=${targetChannel}`
+        ],
+        "condition": null,
+        "repeat_period": 0
+    };
+};

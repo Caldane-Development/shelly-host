@@ -5,7 +5,7 @@ import roomList from "../assets/json/room-list.json";
 import config from "../assets/json/config.json";
 import { logger } from "../logger";
 import os from "os";
-import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyCloudDevices, shellyCloudRooms, shellyGetMqttSettings, shellyReboot, shellySetWifi, shellyWebhookList } from "../utils/discovery.helper";
+import { composeShellyDevice, discoverShelly, shellyActivateMqtt, shellyActivateWebhook, shellyCloudDevices, shellyCloudRooms, shellyGetMqttSettings, shellyReboot, shellySetWifi, shellyWebhookList, shellyActivateCompanionWebhook, shellyDeleteCompanionWebhooks, shellyDetachInput } from "../utils/discovery.helper";
 import { MqttResponse } from "../../../common/models/mqtt.interface";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
 import { mqttAddListener, mqtt as mqttClient } from "../utils/mqtt.helper";
@@ -259,6 +259,45 @@ shellyRouter.post("/:ip/webhook", async (req: Request, res: Response) => {
     }
 
     res.send(device);
+});
+
+shellyRouter.post("/:ip/companion", async (req: Request, res: Response) => {
+    const ip = req.params.ip;
+    const targetIp: string = (req.body.targetIp || "").trim();
+    const inputId = Number(req.body.inputId ?? 0);
+    const targetChannel = Number(req.body.targetChannel ?? 0) || 0;
+    const detach = req.body.detach !== false; // default true
+
+    if (targetIp === "") {
+        res.status(400).json({ error: "targetIp is required" });
+        return;
+    }
+    if (!Number.isInteger(inputId) || inputId < 0) {
+        res.status(400).json({ error: "inputId must be a non-negative integer" });
+        return;
+    }
+    if (targetIp === ip) {
+        res.status(400).json({ error: "targetIp must be a different device" });
+        return;
+    }
+
+    logger.info(`[server]: Linking companion ${ip} input ${inputId} -> ${targetIp} (detach=${detach})`);
+
+    if (detach) {
+        await shellyDetachInput(ip, inputId);
+    }
+    // Clear any prior hooks to the same target so re-linking stays idempotent.
+    await shellyDeleteCompanionWebhooks(ip, targetIp);
+    const on = await shellyActivateCompanionWebhook(ip, targetIp, targetChannel, "on", inputId);
+    const off = await shellyActivateCompanionWebhook(ip, targetIp, targetChannel, "off", inputId);
+
+    if (!on || !off) {
+        res.status(502).json({ error: "Failed to install companion webhooks on the device" });
+        return;
+    }
+
+    const webhooks = await shellyWebhookList(ip);
+    res.json({ ip, targetIp, inputId, targetChannel, detach, webhooks });
 });
 
 shellyRouter.post("/:ip/wifi", async (req: Request, res: Response) => {
