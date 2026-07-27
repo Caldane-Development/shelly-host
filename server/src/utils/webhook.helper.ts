@@ -1,10 +1,17 @@
-import site from "../assets/json/site.json";
 import { Hook } from "../../../common/models/webhooks.interface";
 import { getSiteConfigCached } from "./site-config.helper";
 import { logger } from "../logger";
 
 export const createWebhookConfig = (deviceName: string, room: number, clientName: string, mode: "on" | "off"): Hook => {
     const name = deviceName.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
+    const base = getSiteConfigCached().webhook;
+    const siteName = getSiteConfigCached().name;
+
+    if (!base) {
+        logger.info(
+            `[server]: Site config 'webhook' host is empty; device webhook URL will be invalid. Set the webhook host in Site Config.`
+        );
+    }
 
     const hookMap = {
         "on": {
@@ -27,7 +34,7 @@ export const createWebhookConfig = (deviceName: string, room: number, clientName
         "name": hookMap[mode].name,
         "ssl_ca": "ca.pem",
         "urls": [
-            `http://${site.buffington.webhook}/api/message/srd/${site.buffington.name}/${room}/${name}/switch/message/toggle/${clientName}`
+            `http://${base}/api/message/srd/${siteName}/${room}/${name}/switch/message/toggle/${clientName}`
         ],
         "condition": null,
         "repeat_period": 0

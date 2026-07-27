@@ -31,6 +31,16 @@ interface ReapplyMqttResult {
     failures: Array<{ ip: string; name: string; reason: string }>;
 }
 
+interface ReapplyWebhookResult {
+    webhookHost: string;
+    total: number;
+    checked: number;
+    updated: number;
+    unchanged: number;
+    failed: number;
+    failures: Array<{ ip: string; name: string; reason: string }>;
+}
+
 const SiteConfigs = () => {
     const dispatch = useDispatch();
     const networks = useSelector((state: RootState) => state.scanner.networks);
@@ -54,6 +64,9 @@ const SiteConfigs = () => {
     const [reapplyingMqtt, setReapplyingMqtt] = useState(false);
     const [reapplyMessage, setReapplyMessage] = useState("");
     const [reapplyError, setReapplyError] = useState("");
+    const [reapplyingWebhookHost, setReapplyingWebhookHost] = useState(false);
+    const [reapplyWebhookMessage, setReapplyWebhookMessage] = useState("");
+    const [reapplyWebhookError, setReapplyWebhookError] = useState("");
 
     // MQTT broker state
     const [brokers, setBrokers] = useState<MqttBroker[]>([]);
@@ -383,6 +396,50 @@ const SiteConfigs = () => {
         }
     };
 
+    const handleReapplyWebhookHostToDevices = async () => {
+        if (siteWebhook.trim() === "") {
+            setReapplyWebhookError("Set and save a webhook host first.");
+            setReapplyWebhookMessage("");
+            return;
+        }
+
+        setReapplyingWebhookHost(true);
+        setReapplyWebhookError("");
+        setReapplyWebhookMessage("");
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/devices/webhooks/reapply`, {
+                method: "POST",
+            });
+            const data = (await response.json()) as ReapplyWebhookResult | { error?: string };
+
+            if (!response.ok) {
+                throw new Error((data as { error?: string }).error || `Request failed: ${response.status}`);
+            }
+
+            const result = data as ReapplyWebhookResult;
+            const failuresPreview = result.failures
+                .slice(0, 3)
+                .map((failure) => `${failure.name} (${failure.ip || "no-ip"}): ${failure.reason}`)
+                .join("; ");
+
+            setReapplyWebhookMessage(
+                result.failed > 0
+                    ? `Webhook host ${result.webhookHost}: updated ${result.updated}, unchanged ${result.unchanged}, failed ${result.failed}.${failuresPreview ? ` ${failuresPreview}` : ""}`
+                    : `Webhook host ${result.webhookHost}: updated ${result.updated}, unchanged ${result.unchanged}.`
+            );
+
+            if (result.failed > 0) {
+                setReapplyWebhookError(`${result.failed} device(s) failed webhook host update.`);
+            }
+        } catch (err) {
+            console.error("Failed to reapply webhook host", err);
+            setReapplyWebhookError(err instanceof Error ? err.message : "Could not reapply webhook host.");
+        } finally {
+            setReapplyingWebhookHost(false);
+        }
+    };
+
     const savedServers = new Set(brokers.map((broker) => broker.server));
 
     return (
@@ -460,12 +517,21 @@ const SiteConfigs = () => {
                         >
                             {reapplyingMqtt ? "Updating Devices…" : "Update All Devices To Current Broker"}
                         </button>
+                        <button
+                            type="button"
+                            onClick={handleReapplyWebhookHostToDevices}
+                            disabled={reapplyingWebhookHost}
+                        >
+                            {reapplyingWebhookHost ? "Updating Webhooks…" : "Update Incorrect Webhook Hosts"}
+                        </button>
                     </form>
                 )}
                 {siteSaved && <p className={style["network-name"]}>Saved.</p>}
                 {siteError && <p className={style.error}>{siteError}</p>}
                 {reapplyMessage && <p className={style["broker-meta"]}>{reapplyMessage}</p>}
                 {reapplyError && <p className={style.error}>{reapplyError}</p>}
+                {reapplyWebhookMessage && <p className={style["broker-meta"]}>{reapplyWebhookMessage}</p>}
+                {reapplyWebhookError && <p className={style.error}>{reapplyWebhookError}</p>}
             </div>
 
             <div className={style.panel}>

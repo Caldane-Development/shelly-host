@@ -278,6 +278,117 @@ shellyRouter.post("/devices/mqtt/reapply", async (_: Request, res: Response) => 
     }
 });
 
+const normalizeHost = (value: string): string =>
+    value.replace(/^[a-z]+:\/\//i, "").replace(/\/+$/, "").trim().toLocaleLowerCase();
+
+const extractUrlHost = (urlValue: string): string => {
+    try {
+        return normalizeHost(new URL(urlValue).host);
+    } catch {
+        const match = urlValue.match(/^https?:\/\/([^/]+)/i);
+        return normalizeHost(match?.[1] ?? "");
+    }
+};
+
+const isManagedWebhookUrl = (urlValue: string): boolean => {
+    try {
+        return new URL(urlValue).pathname.startsWith("/api/");
+    } catch {
+        return /\/api\//i.test(urlValue);
+    }
+};
+
+shellyRouter.post("/devices/webhooks/reapply", async (_: Request, res: Response) => {
+    const webhookHost = getSiteConfigCached().webhook.trim();
+    if (!webhookHost) {
+        res.status(400).json({ error: "Site webhook host is not configured." });
+        return;
+    }
+
+    const desiredHost = normalizeHost(webhookHost);
+    try {
+        const storedDevices = await getStoredIDevices();
+        if (storedDevices.length === 0) {
+            res.json({
+                webhookHost,
+                total: 0,
+                checked: 0,
+                updated: 0,
+                unchanged: 0,
+                failed: 0,
+                failures: [] as { ip: string; name: string; reason: string }[],
+            });
+            return;
+        }
+
+        const failures: { ip: string; name: string; reason: string }[] = [];
+        let updated = 0;
+        let unchanged = 0;
+        let checked = 0;
+
+        for (const device of storedDevices) {
+            try {
+                if (!device.ip) {
+                    failures.push({ ip: "", name: device.name || "(unknown)", reason: "Missing device IP" });
+                    continue;
+                }
+
+                const webhookList = await shellyWebhookList(device.ip);
+                checked++;
+                const hooks = webhookList?.result?.hooks ?? [];
+                const managedUrls = hooks.flatMap((hook) => hook.urls ?? []).filter(isManagedWebhookUrl);
+
+                const hasIncorrectHost = managedUrls.some((urlValue) => {
+                    const currentHost = extractUrlHost(urlValue);
+                    return currentHost !== "" && currentHost !== desiredHost;
+                });
+
+                if (!hasIncorrectHost) {
+                    unchanged++;
+                    continue;
+                }
+
+                const deviceWithHooks: IDevice = {
+                    ...device,
+                    webhooks: webhookList ?? undefined,
+                };
+
+                const [onResult, offResult] = await Promise.all([
+                    shellyActivateWebhook(device.ip, deviceWithHooks, "on"),
+                    shellyActivateWebhook(device.ip, deviceWithHooks, "off"),
+                ]);
+
+                if (!onResult || !offResult) {
+                    failures.push({ ip: device.ip, name: device.name || "(unknown)", reason: "Webhook update failed" });
+                    continue;
+                }
+
+                await shellyReboot(device.ip);
+                updated++;
+            } catch (error: Error | any) {
+                failures.push({
+                    ip: device.ip || "",
+                    name: device.name || "(unknown)",
+                    reason: error?.message || "Unknown error",
+                });
+            }
+        }
+
+        res.json({
+            webhookHost,
+            total: storedDevices.length,
+            checked,
+            updated,
+            unchanged,
+            failed: failures.length,
+            failures,
+        });
+    } catch (error) {
+        logger.error(`[server]: Failed to reapply webhook host to devices: ${error}`);
+        res.status(500).json({ error: "Failed to reapply webhook host to devices" });
+    }
+});
+
 shellyRouter.post("/:ip/mqtt", async (req: Request, res: Response) => {
     logger.info(`[server]: Activating MQTT for device with IP: ${req.params.ip}`);
     const ip = req.params.ip;
