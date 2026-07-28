@@ -14,11 +14,9 @@ const groupUrlPattern = /\/api\/group\/\d+\/trigger/i;
 const extractLinkedTargets = (
     device: IDevice,
     sourceSlug: string,
-    groupNameById: Map<number, string>,
-    controllerGroupNames: string[]
+    groupNameById: Map<number, string>
 ): string[] => {
     const details = new Set<string>();
-    controllerGroupNames.forEach((name) => details.add(`Group: ${name}`));
 
     const hooks = device.webhooks?.result?.hooks ?? [];
     for (const hook of hooks) {
@@ -168,39 +166,19 @@ const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"], linkedTargets: stri
 
 export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void> => {
     const groups = await db
-        .select({ id: switchGroups.id, name: switchGroups.name, controllerDeviceId: switchGroups.controllerDeviceId })
+        .select({ id: switchGroups.id, name: switchGroups.name })
         .from(switchGroups);
-    const controllerIds = new Set(
-        groups
-            .map((group) => group.controllerDeviceId)
-            .filter((id): id is string => Boolean(id && id.trim() !== ""))
-    );
     const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
-    const groupNamesByControllerId = new Map<string, string[]>();
-
-    groups.forEach((group) => {
-        if (!group.controllerDeviceId) {
-            return;
-        }
-        const key = group.controllerDeviceId;
-        const names = groupNamesByControllerId.get(key) ?? [];
-        names.push(group.name);
-        groupNamesByControllerId.set(key, names);
-    });
 
     const rows = discovered
         .filter((d) => d?.device && d.device.id !== undefined && d.device.id !== null)
         .map((d) => {
-            const deviceId = String(d.device.id);
             const sourceSlug = slugify(d.name || d.device.name || "");
-            const controllerGroupNames = (groupNamesByControllerId.get(deviceId) ?? []).sort((a, b) =>
-                a.localeCompare(b, undefined, { sensitivity: "base" })
-            );
-            const linkedTargets = extractLinkedTargets(d, sourceSlug, groupNameById, controllerGroupNames);
+            const linkedTargets = extractLinkedTargets(d, sourceSlug, groupNameById);
             const linkedInputTargets = extractLinkedTargetsByInput(d, sourceSlug, groupNameById);
             return {
                 ...toDeviceRow(d.device, d.mqtt, linkedTargets, linkedInputTargets),
-                linked: linkedTargets.length > 0 || hasLinkedActions(d) || controllerIds.has(deviceId),
+                linked: linkedTargets.length > 0 || hasLinkedActions(d),
             };
         });
 

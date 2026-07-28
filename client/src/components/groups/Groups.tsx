@@ -26,7 +26,6 @@ interface SwitchGroup {
     id: number;
     name: string;
     roomId: number | null;
-    controllerDeviceId: string | null;
     tieBreak: string;
     members: GroupMember[];
 }
@@ -36,7 +35,6 @@ const emptyDraft = () => ({
     roomId: "" as number | "",
     tieBreak: "on",
     memberIds: [] as string[],
-    controllerId: "" as string,
 });
 
 const Groups = () => {
@@ -84,7 +82,6 @@ const Groups = () => {
             roomId: group.roomId ?? "",
             tieBreak: group.tieBreak,
             memberIds: group.members.map((m) => m.deviceId),
-            controllerId: group.controllerDeviceId ?? "",
         });
         setEditingId(group.id);
     };
@@ -139,25 +136,7 @@ const Groups = () => {
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            const saved: SwitchGroup = await response.json();
-
-            // If a controller device was chosen (and it changed), install the
-            // trigger webhooks on it via the dedicated endpoint. A device event
-            // then toggles the whole group.
-            const originalController =
-                editingId === "new"
-                    ? null
-                    : groups.find((g) => g.id === editingId)?.controllerDeviceId ?? null;
-            if (draft.controllerId !== "" && draft.controllerId !== originalController) {
-                const ctrlRes = await fetch(`${BACKEND_URL}/group/${saved.id}/controller`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ deviceId: draft.controllerId }),
-                });
-                if (!ctrlRes.ok) {
-                    throw new Error(`Failed to assign controller device: ${ctrlRes.status}`);
-                }
-            }
+            await response.json();
 
             await loadAll();
             cancelEdit();
@@ -203,6 +182,15 @@ const Groups = () => {
 
     const deviceName = (id: string) => devices.find((d) => d.id === id)?.name ?? id;
     const roomName = (id: number | null) => (id == null ? "—" : rooms.find((r) => r.id === id)?.name ?? "—");
+    const byRoomThenName = <T extends { roomId: number | null; name: string }>(items: T[]): T[] =>
+        [...items].sort((a, b) => {
+            const roomCompare = roomName(a.roomId).localeCompare(roomName(b.roomId), undefined, { sensitivity: "base" });
+            if (roomCompare !== 0) {
+                return roomCompare;
+            }
+            return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+        });
+    const sortedDevices = byRoomThenName(devices);
 
     return (
         <section className={style.groups}>
@@ -257,27 +245,10 @@ const Groups = () => {
                         </select>
                     </label>
 
-                    <label className={style.field}>
-                        <span>Controller device (its button event toggles this group)</span>
-                        <select
-                            value={draft.controllerId}
-                            onChange={(e) =>
-                                setDraft((prev) => ({ ...prev, controllerId: e.target.value }))
-                            }
-                        >
-                            <option value="">None</option>
-                            {devices.map((device) => (
-                                <option key={device.id} value={device.id}>
-                                    {device.name} ({roomName(device.roomId)})
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-
                     <div className={style.members}>
                         <span className={style["members-title"]}>Members</span>
                         <div className={style["members-list"]}>
-                            {devices.map((device) => (
+                            {sortedDevices.map((device) => (
                                 <label key={device.id} className={style.member}>
                                     <input
                                         type="checkbox"
@@ -315,11 +286,8 @@ const Groups = () => {
                             <span className={style.meta}>
                                 Tie-break: all {group.tieBreak === "off" ? "OFF" : "ON"}
                             </span>
-                            <span className={style.meta}>
-                                Controller: {group.controllerDeviceId ? deviceName(group.controllerDeviceId) : "—"}
-                            </span>
                             <ul className={style["member-tags"]}>
-                                {group.members.map((member) => (
+                                {byRoomThenName(group.members).map((member) => (
                                     <li key={member.deviceId}>{member.name || deviceName(member.deviceId)}</li>
                                 ))}
                             </ul>

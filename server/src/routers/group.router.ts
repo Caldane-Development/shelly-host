@@ -36,7 +36,7 @@ groupRouter.get("/:id", async (req: Request, res: Response) => {
 });
 
 groupRouter.post("/", async (req: Request, res: Response) => {
-    const { name, roomId, controllerDeviceId, tieBreak, memberDeviceIds } = req.body ?? {};
+    const { name, roomId, tieBreak, memberDeviceIds } = req.body ?? {};
     if (!name || String(name).trim() === "") {
         return res.status(400).send("name is required");
     }
@@ -44,7 +44,6 @@ groupRouter.post("/", async (req: Request, res: Response) => {
         const group = await createGroup(
             String(name).trim(),
             roomId ?? null,
-            controllerDeviceId ?? null,
             tieBreak === "off" ? "off" : "on",
             Array.isArray(memberDeviceIds) ? memberDeviceIds : []
         );
@@ -59,7 +58,7 @@ groupRouter.put("/:id", async (req: Request, res: Response) => {
     if (Number.isNaN(id)) {
         return res.status(400).send("Invalid group id");
     }
-    const { name, roomId, controllerDeviceId, tieBreak, memberDeviceIds } = req.body ?? {};
+    const { name, roomId, tieBreak, memberDeviceIds } = req.body ?? {};
     try {
         const existing = await getGroup(id);
         if (!existing) {
@@ -68,7 +67,6 @@ groupRouter.put("/:id", async (req: Request, res: Response) => {
         await updateGroup(id, {
             ...(name !== undefined ? { name: String(name).trim() } : {}),
             ...(roomId !== undefined ? { roomId } : {}),
-            ...(controllerDeviceId !== undefined ? { controllerDeviceId } : {}),
             ...(tieBreak !== undefined ? { tieBreak: tieBreak === "off" ? "off" : "on" } : {}),
         });
         if (Array.isArray(memberDeviceIds)) {
@@ -115,7 +113,8 @@ groupRouter.get("/:id/trigger", async (req: Request, res: Response) => {
     res.json(result);
 });
 
-// Assign a physical controller device and install trigger webhooks on it.
+// Install trigger webhooks on a physical device so its input toggles this
+// group. We no longer persist controller ownership on the group itself.
 groupRouter.post("/:id/controller", async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) {
@@ -137,16 +136,6 @@ groupRouter.post("/:id/controller", async (req: Request, res: Response) => {
     if (!device || !device.ip) {
         return res.status(404).send("Controller device not found or has no IP");
     }
-    // If a different device previously controlled this group, remove its stale hooks.
-    if (group.controllerDeviceId && group.controllerDeviceId !== String(deviceId)) {
-        const [previous] = await db
-            .select()
-            .from(devicesTable)
-            .where(eq(devicesTable.id, String(group.controllerDeviceId)));
-        if (previous?.ip) {
-            await shellyDeleteGroupWebhooks(previous.ip, id);
-        }
-    }
     // Clear any existing hooks for this group on the target device to stay idempotent.
     await shellyDeleteGroupWebhooks(device.ip, id);
     const on = await shellyActivateGroupWebhook(device.ip, id, "on", inputId);
@@ -158,6 +147,5 @@ groupRouter.post("/:id/controller", async (req: Request, res: Response) => {
         .update(devicesTable)
         .set({ linked: true })
         .where(eq(devicesTable.id, String(deviceId)));
-    await updateGroup(id, { controllerDeviceId: String(deviceId) });
     res.json(await getGroup(id));
 });

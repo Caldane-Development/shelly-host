@@ -70,7 +70,6 @@ const GROUPS_ROOM_VALUE = "__groups__";
 export interface DeviceGroup {
     id: number;
     name: string;
-    controllerDeviceId: string | null;
     members?: { deviceId: string }[];
 }
 
@@ -540,9 +539,6 @@ const ShellyEntity = ({
         }
     };
 
-    // Groups this device relates to, derived from the parent-provided list.
-    const deviceId = deviceEntity.device?.id?.toString() ?? "";
-    const controlledGroups = groups.filter((g) => g.controllerDeviceId === deviceId);
     const persistedInputTargets = deviceEntity.linkedInputTargets?.[String(resolvedInputIndex)] ?? [];
     const linkedByHooks = hasLinkedActions(deviceEntity, isInputTile ? resolvedInputIndex : undefined);
     const linked = isInputTile
@@ -562,10 +558,6 @@ const ShellyEntity = ({
         });
 
         const sourceSlug = slugify(deviceEntity.name || "");
-
-        for (const group of isInputTile ? [] : controlledGroups) {
-            details.add(`Group: ${group.name}`);
-        }
 
         const hooks = deviceEntity.webhooks?.result?.hooks ?? [];
         for (const hook of hooks) {
@@ -878,7 +870,7 @@ const ShellyEntity = ({
                         <p className={style["dialog-note"]}>
                             Flipping <b>{deviceEntity.name}</b> will toggle the linked target device.
                             Pick a room to link to an MQTT-enabled target device, or choose Groups to link this
-                            input as a switch-group controller.
+                            input to a switch group trigger.
                         </p>
 
                         <label className={style["dialog-field"]}>

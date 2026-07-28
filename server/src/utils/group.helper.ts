@@ -16,7 +16,6 @@ export interface SwitchGroup {
     id: number;
     name: string;
     roomId: number | null;
-    controllerDeviceId: string | null;
     tieBreak: string;
     members: GroupMember[];
 }
@@ -54,7 +53,6 @@ export const getGroups = async (): Promise<SwitchGroup[]> => {
             id: group.id,
             name: group.name,
             roomId: group.roomId,
-            controllerDeviceId: group.controllerDeviceId,
             tieBreak: group.tieBreak,
             members: await loadMembers(group.id),
         }))
@@ -70,7 +68,6 @@ export const getGroup = async (id: number): Promise<SwitchGroup | null> => {
         id: group.id,
         name: group.name,
         roomId: group.roomId,
-        controllerDeviceId: group.controllerDeviceId,
         tieBreak: group.tieBreak,
         members: await loadMembers(group.id),
     };
@@ -79,13 +76,12 @@ export const getGroup = async (id: number): Promise<SwitchGroup | null> => {
 export const createGroup = async (
     name: string,
     roomId: number | null,
-    controllerDeviceId: string | null,
     tieBreak: string,
     memberDeviceIds: string[]
 ): Promise<SwitchGroup> => {
     const [group] = await db
         .insert(switchGroups)
-        .values({ name, roomId, controllerDeviceId, tieBreak, modified: new Date() })
+        .values({ name, roomId, tieBreak, modified: new Date() })
         .returning();
 
     await setMembers(group.id, memberDeviceIds);
@@ -94,7 +90,7 @@ export const createGroup = async (
 
 export const updateGroup = async (
     id: number,
-    update: { name?: string; roomId?: number | null; controllerDeviceId?: string | null; tieBreak?: string }
+    update: { name?: string; roomId?: number | null; tieBreak?: string }
 ): Promise<SwitchGroup | null> => {
     await db
         .update(switchGroups)

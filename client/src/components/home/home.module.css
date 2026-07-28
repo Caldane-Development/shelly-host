@@ -3,6 +3,9 @@ section.home {
   flex-direction: column;
   gap: 2rem;
   align-items: center;
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 1.5rem 0 2rem;
 }
 
 .tiles {
@@ -11,6 +14,24 @@ section.home {
   gap: 1.5rem;
   width: 100%;
   max-width: 720px;
+}
+
+@media (max-width: 640px) {
+  section.home {
+    gap: 1.5rem;
+    padding-top: 0.75rem;
+  }
+
+  .tiles {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    max-width: 100%;
+  }
+
+  button.tile {
+    min-height: 140px;
+    padding: 1.5rem 0.75rem;
+  }
 }
 
 button.tile {
