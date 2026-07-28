@@ -2,7 +2,7 @@ import { Device, IDevice } from "../../../common/models/device.interface";
 import { createMqttConfig } from "./mqtt.helper";
 import roomList from "../assets/json/room-list.json";
 import { db } from "../db/client";
-import { devices as devicesTable } from "../db/schema";
+import { devices as devicesTable, switchGroups } from "../db/schema";
 import { logger } from "../logger";
 import { sql } from "drizzle-orm";
 
@@ -88,11 +88,20 @@ const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"]) => ({
 });
 
 export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void> => {
+    const groups = await db
+        .select({ controllerDeviceId: switchGroups.controllerDeviceId })
+        .from(switchGroups);
+    const controllerIds = new Set(
+        groups
+            .map((group) => group.controllerDeviceId)
+            .filter((id): id is string => Boolean(id && id.trim() !== ""))
+    );
+
     const rows = discovered
         .filter((d) => d?.device && d.device.id !== undefined && d.device.id !== null)
         .map((d) => ({
             ...toDeviceRow(d.device, d.mqtt),
-            linked: hasLinkedActions(d),
+            linked: hasLinkedActions(d) || controllerIds.has(String(d.device.id)),
         }));
 
     if (rows.length === 0) {

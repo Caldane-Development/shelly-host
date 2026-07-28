@@ -85,9 +85,10 @@ section.shelly-entity {
     &[data-linked] {
         border: #04619127 solid 3px;
         background-color: #d8ecf1ce;
+        color: black;
 
         h3 {
-            color: #046191;
+            color: black;
         }
     }
 
