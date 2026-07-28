@@ -482,6 +482,37 @@ const ShellyEntity = ({
     const memberGroups = groups.filter((g) => g.members?.some((m) => m.deviceId === deviceId));
     const controlledGroups = groups.filter((g) => g.controllerDeviceId === deviceId);
     const linked = hasLinkedActions(deviceEntity) || Boolean(deviceEntity.linked);
+    const linkedTargets = (() => {
+        const details = new Set<string>();
+        const sourceSlug = slugify(deviceEntity.name || "");
+
+        for (const group of controlledGroups) {
+            details.add(`Group: ${group.name}`);
+        }
+
+        const hooks = deviceEntity.webhooks?.result?.hooks ?? [];
+        for (const hook of hooks) {
+            for (const url of hook.urls ?? []) {
+                const groupMatch = url.match(/\/api\/group\/(\d+)\/trigger/i);
+                if (groupMatch) {
+                    const id = Number(groupMatch[1]);
+                    const groupName = groups.find((g) => g.id === id)?.name;
+                    details.add(groupName ? `Group: ${groupName}` : `Group ID: ${id}`);
+                }
+
+                const messageMatch = linkMessagePattern.exec(url);
+                if (messageMatch) {
+                    const targetSlug = slugify(messageMatch[2] || "");
+                    if (targetSlug && targetSlug !== sourceSlug) {
+                        details.add(`Device: ${targetSlug}`);
+                    }
+                }
+            }
+        }
+
+        return [...details].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    })();
+    const linkedTitle = linkedTargets.length > 0 ? linkedTargets.join("; ") : linked ? "Linked target details unavailable" : "Not linked";
 
     return (
         <section
@@ -510,9 +541,6 @@ const ShellyEntity = ({
             <p>
                 <b>MQTT Server:</b> {deviceEntity.mqtt?.server || "N/A"}
             </p>
-            <p>
-                <b>Linked:</b> {linked ? "Yes" : "No"}
-            </p>
             {deviceEntity.verificationWarning && (
                 <p className={style.warning} title={deviceEntity.verificationWarning}>
                     <b>MQTT Verify:</b> Pending device recheck
@@ -531,6 +559,9 @@ const ShellyEntity = ({
                 ) : (
                     "N/A"
                 )}
+            </p>
+            <p>
+                <b title={linkedTitle}>Linked:</b> <span title={linkedTitle}>{linked ? "Yes" : "No"}</span>
             </p>
             {(memberGroups.length > 0 || controlledGroups.length > 0) && (
                 <div className={style.groups}>
