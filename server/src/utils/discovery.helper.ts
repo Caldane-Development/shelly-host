@@ -44,6 +44,14 @@ interface ShellyRpcResponse<T = Record<string, unknown>> {
     error?: ShellyRpcError;
 }
 
+const buildCloudApiUrl = (baseUrl: string, endpointPath: string): string => {
+    const trimmedBase = baseUrl.replace(/\/+$/, "");
+    if (trimmedBase.endsWith("/interface") && endpointPath.startsWith("/interface/")) {
+        return `${trimmedBase}${endpointPath.replace(/^\/interface/, "")}`;
+    }
+    return `${trimmedBase}${endpointPath}`;
+};
+
 
 export const discoverShelly = async (ip: string): Promise<ShellyStatusResult | null> => {
     const options = {
@@ -109,16 +117,17 @@ export const shellyDeviceInfo = async (ip: string): Promise<ShellyDeviceInfo | n
 };
 
 export const shellyCloudDevices = async (): Promise<any> => {
-    const auth_key = getSiteConfigCached().cloudAuthKey;
+    const configCache = getSiteConfigCached();
+    const auth_key = configCache.cloudAuthKey;
+    const cloudBaseUrl = configCache.cloudServerUrl || config.discover["cloud-access"].url || "";
     const postData = {
         auth_key: auth_key, // sourced from site config (DB)
     };
 
     const postResponse = await postRequest<{}>(
-        `${config.discover["cloud-access"].url}${config.discover["cloud-access"]["list-path"]}`,
+        buildCloudApiUrl(cloudBaseUrl, config.discover["cloud-access"]["list-path"]),
         {
             "Content-Type": "application/x-www-form-urlencoded",
-            Host: "shelly-89-eu.shelly.cloud",
         },
         postData
     );
@@ -127,16 +136,17 @@ export const shellyCloudDevices = async (): Promise<any> => {
 };
 
 export const shellyCloudRooms = async (): Promise<any> => {
-    const auth_key = getSiteConfigCached().cloudAuthKey;
+    const configCache = getSiteConfigCached();
+    const auth_key = configCache.cloudAuthKey;
+    const cloudBaseUrl = configCache.cloudServerUrl || config.discover["cloud-access"].url || "";
     const postData = {
         auth_key: auth_key, // sourced from site config (DB)
     };
 
     const postResponse = await postRequest<{}>(
-        `${config.discover["cloud-access"].url}${config.discover["cloud-access"]["room-list-path"]}`,
+        buildCloudApiUrl(cloudBaseUrl, config.discover["cloud-access"]["room-list-path"]),
         {
             "Content-Type": "application/x-www-form-urlencoded",
-            Host: "shelly-89-eu.shelly.cloud",
         },
         postData
     );

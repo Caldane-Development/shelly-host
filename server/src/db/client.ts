@@ -2,6 +2,7 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 import site from "../assets/json/site.json";
+import config from "../assets/json/config.json";
 
 const connectionString = process.env.DATABASE_URL as string;
 
@@ -81,6 +82,7 @@ export const ensureSchema = async (): Promise<void> => {
             description text DEFAULT '',
             mqtt text DEFAULT '',
             webhook text DEFAULT '',
+            cloud_server_url text DEFAULT '',
             street text DEFAULT '',
             city text DEFAULT '',
             state text DEFAULT '',
@@ -93,16 +95,20 @@ export const ensureSchema = async (): Promise<void> => {
     await queryClient`
         ALTER TABLE site_config ADD COLUMN IF NOT EXISTS cloud_auth_key text DEFAULT '';
     `;
+    await queryClient`
+        ALTER TABLE site_config ADD COLUMN IF NOT EXISTS cloud_server_url text DEFAULT '';
+    `;
     // Seed the single site_config row (id=1) from site.json on first run only.
     const buffington = site.buffington;
     await queryClient`
-        INSERT INTO site_config (id, name, description, mqtt, webhook, street, city, state, zip, modified)
+        INSERT INTO site_config (id, name, description, mqtt, webhook, cloud_server_url, street, city, state, zip, modified)
         VALUES (
             1,
             ${buffington.name ?? ""},
             ${buffington.description ?? ""},
             ${buffington.mqtt ?? ""},
             ${buffington.webhook ?? ""},
+            ${config.discover["cloud-access"].url ?? ""},
             ${buffington.address?.street ?? ""},
             ${buffington.address?.city ?? ""},
             ${buffington.address?.state ?? ""},
@@ -121,6 +127,11 @@ export const ensureSchema = async (): Promise<void> => {
             WHERE id = 1 AND (cloud_auth_key IS NULL OR cloud_auth_key = '');
         `;
     }
+    await queryClient`
+        UPDATE site_config
+        SET cloud_server_url = ${process.env.SHELLY_CLOUD_SERVER_URL ?? config.discover["cloud-access"].url ?? ""}
+        WHERE id = 1 AND (cloud_server_url IS NULL OR cloud_server_url = '');
+    `;
     await queryClient`
         CREATE TABLE IF NOT EXISTS switch_groups (
             id serial PRIMARY KEY,

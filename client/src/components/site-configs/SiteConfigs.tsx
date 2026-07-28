@@ -77,6 +77,8 @@ const SiteConfigs = () => {
     const [siteMqtt, setSiteMqtt] = useState("");
     // Host:port the Shelly devices call back to when an input toggles (group triggers).
     const [siteWebhook, setSiteWebhook] = useState("");
+    // Base URL for Shelly Cloud API (scanner uses this to fetch live devices/rooms).
+    const [siteCloudServerUrl, setSiteCloudServerUrl] = useState("");
     const [siteLoading, setSiteLoading] = useState(true);
     const [siteError, setSiteError] = useState("");
     const [siteSaved, setSiteSaved] = useState(false);
@@ -180,10 +182,11 @@ const SiteConfigs = () => {
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            const data: { name: string; mqtt: string; webhook?: string; cloudAuthKey?: string } = await response.json();
+            const data: { name: string; mqtt: string; webhook?: string; cloudServerUrl?: string; cloudAuthKey?: string } = await response.json();
             setSiteName(data.name ?? "");
             setSiteMqtt(data.mqtt ?? "");
             setSiteWebhook(data.webhook ?? "");
+            setSiteCloudServerUrl(data.cloudServerUrl ?? "");
             setSiteCloudKeyHint(data.cloudAuthKey ?? "");
         } catch (err) {
             console.error("Failed to fetch site config", err);
@@ -211,6 +214,7 @@ const SiteConfigs = () => {
                     name: trimmedName,
                     mqtt: siteMqtt.trim(),
                     webhook: siteWebhook.trim(),
+                    cloudServerUrl: siteCloudServerUrl.trim(),
                     // Only send the key when the user actually entered one, so we
                     // never persist the masked hint back over the real key.
                     ...(trimmedCloudKey !== "" ? { cloudAuthKey: trimmedCloudKey } : {}),
@@ -219,10 +223,11 @@ const SiteConfigs = () => {
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            const data: { name: string; mqtt: string; webhook?: string; cloudAuthKey?: string } = await response.json();
+            const data: { name: string; mqtt: string; webhook?: string; cloudServerUrl?: string; cloudAuthKey?: string } = await response.json();
             setSiteName(data.name ?? "");
             setSiteMqtt(data.mqtt ?? "");
             setSiteWebhook(data.webhook ?? "");
+            setSiteCloudServerUrl(data.cloudServerUrl ?? "");
             setSiteCloudKeyHint(data.cloudAuthKey ?? "");
             setSiteCloudKey("");
             setSiteError("");
@@ -554,6 +559,15 @@ const SiteConfigs = () => {
                             value={siteWebhook}
                             onChange={(e) => {
                                 setSiteWebhook(e.target.value);
+                                if (siteError) setSiteError("");
+                            }}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Shelly cloud URL, e.g. https://shelly-89-eu.shelly.cloud"
+                            value={siteCloudServerUrl}
+                            onChange={(e) => {
+                                setSiteCloudServerUrl(e.target.value);
                                 if (siteError) setSiteError("");
                             }}
                         />

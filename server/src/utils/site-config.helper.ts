@@ -3,12 +3,14 @@ import { db } from "../db/client";
 import { siteConfig } from "../db/schema";
 import { logger } from "../logger";
 import site from "../assets/json/site.json";
+import config from "../assets/json/config.json";
 
 export interface SiteConfig {
     name: string;
     description: string;
     mqtt: string;
     webhook: string;
+    cloudServerUrl: string;
     street: string;
     city: string;
     state: string;
@@ -22,6 +24,7 @@ const fallback: SiteConfig = {
     description: site.buffington.description ?? "",
     mqtt: site.buffington.mqtt ?? "",
     webhook: site.buffington.webhook ?? "",
+    cloudServerUrl: process.env.SHELLY_CLOUD_SERVER_URL ?? config.discover["cloud-access"].url ?? "",
     street: site.buffington.address?.street ?? "",
     city: site.buffington.address?.city ?? "",
     state: site.buffington.address?.state ?? "",
@@ -38,6 +41,7 @@ const rowToConfig = (row: typeof siteConfig.$inferSelect): SiteConfig => ({
     description: row.description ?? "",
     mqtt: row.mqtt ?? "",
     webhook: row.webhook ?? "",
+    cloudServerUrl: row.cloudServerUrl ?? "",
     street: row.street ?? "",
     city: row.city ?? "",
     state: row.state ?? "",
@@ -77,6 +81,7 @@ export const saveSiteConfig = async (update: Partial<SiteConfig>): Promise<SiteC
                 description: merged.description,
                 mqtt: merged.mqtt,
                 webhook: merged.webhook,
+                cloudServerUrl: merged.cloudServerUrl,
                 street: merged.street,
                 city: merged.city,
                 state: merged.state,

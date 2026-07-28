@@ -68,6 +68,7 @@ export const siteConfig = pgTable('site_config', {
   description: text('description').default(''),
   mqtt: text('mqtt').default(''),
   webhook: text('webhook').default(''),
+  cloudServerUrl: text('cloud_server_url').default(''),
   street: text('street').default(''),
   city: text('city').default(''),
   state: text('state').default(''),

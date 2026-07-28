@@ -26,7 +26,7 @@ siteConfigRouter.get("/", async (_req: Request, res: Response) => {
 });
 
 siteConfigRouter.put("/", async (req: Request, res: Response) => {
-    const { name, description, mqtt, webhook, street, city, state, zip, cloudAuthKey } = req.body ?? {};
+    const { name, description, mqtt, webhook, cloudServerUrl, street, city, state, zip, cloudAuthKey } = req.body ?? {};
 
     if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
         res.status(400).json({ error: "name must be a non-empty string" });
@@ -34,11 +34,17 @@ siteConfigRouter.put("/", async (req: Request, res: Response) => {
     }
 
     try {
+        if (cloudServerUrl !== undefined && typeof cloudServerUrl !== "string") {
+            res.status(400).json({ error: "cloudServerUrl must be a string" });
+            return;
+        }
+
         const saved = await saveSiteConfig({
             ...(name !== undefined ? { name: name.trim() } : {}),
             ...(description !== undefined ? { description } : {}),
             ...(mqtt !== undefined ? { mqtt } : {}),
             ...(webhook !== undefined ? { webhook } : {}),
+            ...(cloudServerUrl !== undefined ? { cloudServerUrl: cloudServerUrl.trim() } : {}),
             ...(street !== undefined ? { street } : {}),
             ...(city !== undefined ? { city } : {}),
             ...(state !== undefined ? { state } : {}),
