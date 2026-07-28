@@ -4,7 +4,7 @@ import roomList from "../assets/json/room-list.json";
 import { db } from "../db/client";
 import { devices as devicesTable, switchGroups } from "../db/schema";
 import { logger } from "../logger";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const slugify = (text: string): string => text.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
 
@@ -318,4 +318,19 @@ export const getStoredIDevices = async (): Promise<IDevice[]> => {
 export const getEnabledDevices = async (): Promise<Device[]> => {
     const rows = await getStoredDevices();
     return rows.filter((row) => row.mqttEnable).map(toDevice);
+};
+
+export const updateStoredDeviceRoom = async (deviceId: string, roomId: number): Promise<boolean> => {
+    try {
+        const updated = await db
+            .update(devicesTable)
+            .set({ roomId, modified: new Date() })
+            .where(eq(devicesTable.id, deviceId))
+            .returning({ id: devicesTable.id });
+
+        return updated.length > 0;
+    } catch (error) {
+        logger.error(`[server]: Failed to update device room (${deviceId} -> ${roomId}): ${error}`);
+        return false;
+    }
 };

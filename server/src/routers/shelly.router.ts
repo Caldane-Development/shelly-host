@@ -10,7 +10,7 @@ import { MqttResponse } from "../../../common/models/mqtt.interface";
 import { DeviceList, IDevice } from "../../../common/models/device.interface";
 import { Hook } from "../../../common/models/webhooks.interface";
 import { mqttAddListener, mqtt as mqttClient } from "../utils/mqtt.helper";
-import { getStoredDevices, getStoredIDevices, getEnabledDevices, saveDiscoveredDevices } from "../utils/device.helper";
+import { getStoredDevices, getStoredIDevices, getEnabledDevices, saveDiscoveredDevices, updateStoredDeviceRoom } from "../utils/device.helper";
 import { getStoredRooms, saveDiscoveredRooms } from "../utils/room.helper";
 import { getWifiCredentialBySsid } from "../utils/wifi.helper";
 import { getSiteConfigCached } from "../utils/site-config.helper";
@@ -237,12 +237,25 @@ const resolveDeviceCatalog = async (): Promise<DeviceCatalog> => {
 
     try {
         const [cloudRooms, cloudDevices] = await Promise.all([shellyCloudRooms(), shellyCloudDevices()]);
+        const hasLiveDevices = Boolean(cloudDevices?.isok && cloudDevices?.data?.devices);
+        const hasLiveRooms = Boolean(cloudRooms?.isok && cloudRooms?.data?.rooms);
+
+        if (!hasLiveDevices && !hasLiveRooms) {
+            logger.warn("[server]: Shelly cloud catalog unavailable (devices + rooms). Using bundled snapshot without caching.");
+            return staticCatalog;
+        }
+
         const resolved: DeviceCatalog = {
-            devices: cloudDevices?.isok && cloudDevices?.data?.devices ? (cloudDevices as DeviceList) : staticCatalog.devices,
-            rooms: cloudRooms?.isok && cloudRooms?.data?.rooms ? cloudRooms : staticCatalog.rooms,
+            devices: hasLiveDevices ? (cloudDevices as DeviceList) : staticCatalog.devices,
+            rooms: hasLiveRooms ? cloudRooms : staticCatalog.rooms,
         };
+
+        if (!hasLiveDevices || !hasLiveRooms) {
+            logger.warn(`[server]: Shelly cloud catalog partial. devices=${hasLiveDevices} rooms=${hasLiveRooms}. Using fallback for missing parts.`);
+        }
+
         catalogCache = { data: resolved, expires: Date.now() + CATALOG_TTL_MS };
-        logger.info("[server]: Loaded live Shelly cloud device/room catalog");
+        logger.info(`[server]: Loaded Shelly catalog (devices=${hasLiveDevices ? "cloud" : "snapshot"}, rooms=${hasLiveRooms ? "cloud" : "snapshot"})`);
         return resolved;
     } catch (error: Error | any) {
         logger.warn(`[server]: Shelly cloud fetch failed, using bundled snapshot. Error: ${error?.message}`);
@@ -359,6 +372,47 @@ shellyRouter.get("/devices/detailed", async (_: Request, res: Response) => {
     } catch (error) {
         logger.error(`[server]: Failed to fetch detailed devices: ${error}`);
         res.status(500).send("Failed to fetch detailed devices");
+    }
+});
+
+shellyRouter.post("/devices/:id/room", async (req: Request, res: Response) => {
+    const deviceId = String(req.params.id || "").trim();
+    const roomId = Number(req.body?.roomId);
+
+    if (!deviceId) {
+        res.status(400).json({ error: "Device id is required." });
+        return;
+    }
+    if (!Number.isInteger(roomId) || roomId <= 0) {
+        res.status(400).json({ error: "roomId must be a positive integer." });
+        return;
+    }
+
+    try {
+        const rooms = await getStoredRooms();
+        const roomExists = rooms.some((room) => Number(room.id) === roomId);
+        if (!roomExists) {
+            res.status(404).json({ error: "Room not found." });
+            return;
+        }
+
+        const updated = await updateStoredDeviceRoom(deviceId, roomId);
+        if (!updated) {
+            res.status(404).json({ error: "Device not found." });
+            return;
+        }
+
+        const devices = await getStoredIDevices();
+        const device = devices.find((entry) => String(entry.device?.id) === deviceId);
+        if (!device) {
+            res.status(404).json({ error: "Updated device could not be loaded." });
+            return;
+        }
+
+        res.json({ device });
+    } catch (error) {
+        logger.error(`[server]: Failed to update device room: ${error}`);
+        res.status(500).json({ error: "Failed to update device room." });
     }
 });
 

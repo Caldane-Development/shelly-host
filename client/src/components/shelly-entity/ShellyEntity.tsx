@@ -1,4 +1,4 @@
-import { faCloudArrowUp, faCopy, faLink, faMessage, faObjectGroup, faPowerOff, faTowerBroadcast, faWifi, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCloudArrowUp, faCopy, faLink, faMessage, faObjectGroup, faPen, faPowerOff, faTowerBroadcast, faWifi, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { IDevice } from "../../../../common/models/device.interface";
@@ -124,6 +124,13 @@ const ShellyEntity = ({
     const [selSsid, setSelSsid] = useState("");
     const [wifiDialogError, setWifiDialogError] = useState("");
     const [wifiSubmitting, setWifiSubmitting] = useState(false);
+
+    // Manual room edit dialog state
+    const [showRoomDialog, setShowRoomDialog] = useState(false);
+    const [roomOptions, setRoomOptions] = useState<StoredRoom[]>([]);
+    const [selRoomId, setSelRoomId] = useState<string>("");
+    const [roomDialogError, setRoomDialogError] = useState("");
+    const [roomSubmitting, setRoomSubmitting] = useState(false);
 
     // Link Device dialog state
     const [showCompanionDialog, setShowCompanionDialog] = useState(false);
@@ -317,6 +324,71 @@ const ShellyEntity = ({
     const closeWifiDialog = () => {
         setShowWifiDialog(false);
         setWifiDialogError("");
+    };
+
+    const openRoomDialog = async () => {
+        setRoomDialogError("");
+        setShowRoomDialog(true);
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/rooms`);
+            const rooms: StoredRoom[] = response.ok ? await response.json() : [];
+            const sorted = [...rooms].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+            setRoomOptions(sorted);
+
+            const currentRoomId = Number(deviceEntity.room?.id);
+            const defaultRoomId = Number.isInteger(currentRoomId) && currentRoomId > 0
+                ? currentRoomId
+                : (sorted[0]?.id ?? 0);
+            setSelRoomId(defaultRoomId > 0 ? String(defaultRoomId) : "");
+        } catch (err) {
+            console.error("Failed to load rooms", err);
+            setRoomDialogError("Could not load rooms from the server.");
+        }
+    };
+
+    const closeRoomDialog = () => {
+        setShowRoomDialog(false);
+        setRoomDialogError("");
+    };
+
+    const submitRoomChange = async () => {
+        const roomId = Number(selRoomId);
+        const deviceId = String(deviceEntity.device?.id ?? "").trim();
+
+        if (!deviceId) {
+            setRoomDialogError("This device is missing an id.");
+            return;
+        }
+        if (!Number.isInteger(roomId) || roomId <= 0) {
+            setRoomDialogError("Choose a room.");
+            return;
+        }
+
+        setRoomSubmitting(true);
+        setRoomDialogError("");
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/devices/${deviceId}/room`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId }),
+            });
+
+            const payload = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(payload?.error || `Request failed: ${response.status}`);
+            }
+
+            if (payload?.device) {
+                applyDeviceUpdate(payload.device as IDevice);
+            }
+            closeRoomDialog();
+        } catch (err) {
+            console.error("Failed to update room", err);
+            setRoomDialogError(err instanceof Error ? err.message : "Could not update room.");
+        } finally {
+            setRoomSubmitting(false);
+        }
     };
 
     const submitChangeWifi = async () => {
@@ -637,6 +709,15 @@ const ShellyEntity = ({
                         title="Link Device"
                     >
                         <FontAwesomeIcon icon={faLink} />
+                    </button>
+                )}
+                {mode === "normal" && (
+                    <button
+                        className={style["change-wifi"]}
+                        onClick={openRoomDialog}
+                        title="Edit Room"
+                    >
+                        <FontAwesomeIcon icon={faPen} />
                     </button>
                 )}
             </p>
@@ -996,6 +1077,55 @@ const ShellyEntity = ({
                                 }
                             >
                                 {companionSubmitting ? "Linking…" : "Link Device"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showRoomDialog && (
+                <div className={style["dialog-overlay"]} onClick={closeRoomDialog}>
+                    <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
+                        <div className={style["dialog-header"]}>
+                            <h4>Edit Room - {deviceEntity.name}</h4>
+                            <button className={style["dialog-close"]} onClick={closeRoomDialog} aria-label="Close">
+                                <FontAwesomeIcon icon={faXmark} />
+                            </button>
+                        </div>
+
+                        <label className={style["dialog-field"]}>
+                            <span>Room</span>
+                            <select
+                                value={selRoomId}
+                                onChange={(e) => {
+                                    setSelRoomId(e.target.value);
+                                    if (roomDialogError) setRoomDialogError("");
+                                }}
+                            >
+                                {roomOptions.length === 0 ? (
+                                    <option value="">No rooms available</option>
+                                ) : (
+                                    roomOptions.map((room) => (
+                                        <option key={room.id} value={String(room.id)}>
+                                            {room.name}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </label>
+
+                        {roomDialogError && <p className={style.error}>{roomDialogError}</p>}
+
+                        <div className={style["dialog-actions"]}>
+                            <button type="button" className={style["dialog-cancel"]} onClick={closeRoomDialog} disabled={roomSubmitting}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className={style["dialog-submit"]}
+                                onClick={submitRoomChange}
+                                disabled={roomSubmitting || roomOptions.length === 0}
+                            >
+                                {roomSubmitting ? "Saving..." : "Save Room"}
                             </button>
                         </div>
                     </div>
