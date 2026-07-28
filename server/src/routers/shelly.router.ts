@@ -1845,6 +1845,10 @@ shellyRouter.post("/:ip/companion", async (req: Request, res: Response) => {
         res.status(404).json({ error: "Target device not found or has no room. Re-run a scan and set its room first." });
         return;
     }
+    if (!target.mqtt?.enable) {
+        res.status(400).json({ error: "Target device must have MQTT enabled before linking." });
+        return;
+    }
 
     logger.info(`[server]: Linking companion ${ip} input ${inputId} -> ${target.name} (room ${target.room.id}, detach=${detach})`);
 
@@ -1862,6 +1866,11 @@ shellyRouter.post("/:ip/companion", async (req: Request, res: Response) => {
     }
 
     const webhooks = await shellyWebhookList(ip);
+    const source = storedDevices.find((d) => d.ip === ip);
+    if (source) {
+        source.webhooks = webhooks || undefined;
+        await saveDiscoveredDevices([source]);
+    }
     res.json({ ip, targetIp, targetName: target.name, targetRoomId: target.room.id, inputId, detach, webhooks });
 });
 

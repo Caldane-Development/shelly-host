@@ -154,6 +154,10 @@ groupRouter.post("/:id/controller", async (req: Request, res: Response) => {
     if (!on || !off) {
         return res.status(502).send("Failed to install webhook on controller device");
     }
+    await db
+        .update(devicesTable)
+        .set({ linked: true })
+        .where(eq(devicesTable.id, String(deviceId)));
     await updateGroup(id, { controllerDeviceId: String(deviceId) });
     res.json(await getGroup(id));
 });

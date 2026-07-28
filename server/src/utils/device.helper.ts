@@ -6,6 +6,42 @@ import { devices as devicesTable } from "../db/schema";
 import { logger } from "../logger";
 import { sql } from "drizzle-orm";
 
+const slugify = (text: string): string => text.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
+
+const messageUrlPattern = /\/api\/message\/srd\/[^/]+\/(\d+)\/([^/]+)\/switch\/message\/toggle\/[^/?#]+/i;
+const groupUrlPattern = /\/api\/group\/\d+\/trigger/i;
+
+const hasLinkedActions = (device: IDevice): boolean => {
+    const hooks = device.webhooks?.result?.hooks ?? [];
+    if (!hooks.length) {
+        return false;
+    }
+
+    const sourceSlug = slugify(device.name || "");
+    const sourceRoomId = Number(device.room?.id ?? device.device?.room_id ?? -1);
+
+    for (const hook of hooks) {
+        for (const url of hook.urls ?? []) {
+            if (groupUrlPattern.test(url)) {
+                return true;
+            }
+
+            const match = messageUrlPattern.exec(url);
+            if (!match) {
+                continue;
+            }
+
+            const targetRoomId = Number(match[1]);
+            const targetSlug = slugify(match[2] || "");
+            if (targetSlug !== sourceSlug || targetRoomId !== sourceRoomId) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+};
+
 export const createIDevice = (device: Device): IDevice => {
     const room = roomList.data.rooms[device.room_id.toString() as keyof typeof roomList.data.rooms];
     return {
@@ -48,12 +84,16 @@ const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"]) => ({
     mqttEnable: Boolean(mqtt?.enable),
     mqttServer: mqtt?.server || "",
     mqttTopic: mqtt?.topic_prefix || "",
+    linked: false,
 });
 
 export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void> => {
     const rows = discovered
         .filter((d) => d?.device && d.device.id !== undefined && d.device.id !== null)
-        .map((d) => toDeviceRow(d.device, d.mqtt));
+        .map((d) => ({
+            ...toDeviceRow(d.device, d.mqtt),
+            linked: hasLinkedActions(d),
+        }));
 
     if (rows.length === 0) {
         return;
@@ -84,6 +124,7 @@ export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void
                     mqttEnable: sql`excluded.mqtt_enable`,
                     mqttServer: sql`excluded.mqtt_server`,
                     mqttTopic: sql`excluded.mqtt_topic`,
+                    linked: sql`excluded.linked`,
                 },
             });
         logger.info(`[server]: Saved ${rows.length} discovered device(s) to the database`);
@@ -132,6 +173,7 @@ export const getStoredIDevices = async (): Promise<IDevice[]> => {
         const enable = Boolean(row.mqttEnable);
         return {
             ...device,
+            linked: Boolean(row.linked),
             mqtt: {
                 ...device.mqtt,
                 enable,

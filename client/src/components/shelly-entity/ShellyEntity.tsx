@@ -8,6 +8,37 @@ import style from "./shelly-entity.module.css";
 const TOGGLE_MESSAGE = { src: "buffington.action", method: "Switch.Toggle", params: { id: 0 } };
 
 const slugify = (text: string) => text.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
+const linkMessagePattern = /\/api\/message\/srd\/[^/]+\/(\d+)\/([^/]+)\/switch\/message\/toggle\/[^/?#]+/i;
+const linkGroupPattern = /\/api\/group\/\d+\/trigger/i;
+
+const hasLinkedActions = (device: IDevice): boolean => {
+    const hooks = device.webhooks?.result?.hooks ?? [];
+    if (!hooks.length) {
+        return false;
+    }
+
+    const sourceSlug = slugify(device.name || "");
+    const sourceRoomId = Number(device.room?.id ?? device.device?.room_id ?? -1);
+
+    for (const hook of hooks) {
+        for (const url of hook.urls ?? []) {
+            if (linkGroupPattern.test(url)) {
+                return true;
+            }
+            const match = linkMessagePattern.exec(url);
+            if (!match) {
+                continue;
+            }
+            const targetRoomId = Number(match[1]);
+            const targetSlug = slugify(match[2] || "");
+            if (targetSlug !== sourceSlug || targetRoomId !== sourceRoomId) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+};
 
 interface DialogBroker {
     id: number;
@@ -30,6 +61,11 @@ interface GroupOption {
     name: string;
     controllerDeviceId: string | null;
     members?: { deviceId: string }[];
+}
+
+interface StoredRoom {
+    id: number;
+    name: string;
 }
 
 export interface DeviceGroup {
@@ -91,6 +127,7 @@ const ShellyEntity = ({
     // Companion (3-way) dialog state
     const [showCompanionDialog, setShowCompanionDialog] = useState(false);
     const [companionDevices, setCompanionDevices] = useState<IDevice[]>([]);
+    const [companionRooms, setCompanionRooms] = useState<StoredRoom[]>([]);
     const [selCompRoom, setSelCompRoom] = useState<string>("");
     const [selCompTarget, setSelCompTarget] = useState<string>("");
     const [selCompInput, setSelCompInput] = useState<string>("0");
@@ -113,9 +150,14 @@ const ShellyEntity = ({
     }, [device]);
 
     const applyDeviceUpdate = (updated: IDevice) => {
-        setDeviceEntity(updated);
-        setDeviceName(updated.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
-        onDeviceUpdated?.(updated);
+        const next: IDevice = {
+            ...deviceEntity,
+            ...updated,
+            linked: updated.linked ?? deviceEntity.linked,
+        };
+        setDeviceEntity(next);
+        setDeviceName(next.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
+        onDeviceUpdated?.(next);
     };
 
 
@@ -354,6 +396,7 @@ const ShellyEntity = ({
             closeGroupDialog();
             const groupName = groupOptions.find((g) => String(g.id) === selGroup)?.name ?? selGroup;
             onGroupsChanged?.();
+            setDeviceEntity((prev) => ({ ...prev, linked: true }));
             alert(`${deviceEntity.name} is now the controller for "${groupName}".`);
         } catch (err) {
             console.error("Failed to assign group controller", err);
@@ -371,12 +414,21 @@ const ShellyEntity = ({
         setSelCompInput("0");
         setShowCompanionDialog(true);
         try {
-            const response = await fetch(`${BACKEND_URL}/shelly/devices/detailed`);
-            const devices: IDevice[] = response.ok ? await response.json() : [];
-            // Exclude this device from the target list.
-            const targets = devices.filter((d) => d.ip && d.ip !== deviceEntity.ip);
+            const [roomsResponse, devicesResponse] = await Promise.all([
+                fetch(`${BACKEND_URL}/shelly/rooms`),
+                fetch(`${BACKEND_URL}/shelly/devices/detailed`),
+            ]);
+            const rooms: StoredRoom[] = roomsResponse.ok ? await roomsResponse.json() : [];
+            const devices: IDevice[] = devicesResponse.ok ? await devicesResponse.json() : [];
+
+            // Exclude this device from the target list and only allow linking to
+            // MQTT-enabled targets so we never need an RPC fallback path.
+            const targets = devices.filter((d) => d.ip && d.ip !== deviceEntity.ip && Boolean(d.mqtt?.enable));
             setCompanionDevices(targets);
-            const firstRoom = targets.find((d) => d.room?.name)?.room?.name ?? "";
+            setCompanionRooms(rooms);
+
+            const preferredRoom = deviceEntity.room?.name ?? "";
+            const firstRoom = rooms.find((room) => room.name === preferredRoom)?.name || rooms[0]?.name || "";
             setSelCompRoom(firstRoom);
             const firstTarget = targets.find((d) => (d.room?.name ?? "") === firstRoom);
             setSelCompTarget(firstTarget?.ip ?? "");
@@ -414,21 +466,18 @@ const ShellyEntity = ({
             const targetName =
                 companionDevices.find((d) => d.ip === selCompTarget)?.name ?? selCompTarget;
             closeCompanionDialog();
-            alert(`${deviceEntity.name} (input ${selCompInput}) now toggles "${targetName}".`);
+            setDeviceEntity((prev) => ({ ...prev, linked: true }));
+            alert(`${deviceEntity.name} (input ${selCompInput}) now links to "${targetName}".`);
         } catch (err) {
             console.error("Failed to link companion switch", err);
             setCompanionError(
-                "Could not link the companion switch. Make sure both devices are online and reachable."
+                "Could not link the device. Make sure both devices are online, reachable, and MQTT-enabled."
             );
         } finally {
             setCompanionSubmitting(false);
         }
     };
 
-    // Distinct room names for the target cascading dropdown.
-    const companionRooms = Array.from(
-        new Set(companionDevices.map((d) => d.room?.name).filter((n): n is string => Boolean(n)))
-    );
     const companionTargets = companionDevices.filter((d) => (d.room?.name ?? "") === selCompRoom);
 
     // Devices that share a topic (e.g. a 3-way pairing) all react to the same
@@ -468,6 +517,7 @@ const ShellyEntity = ({
     const deviceId = deviceEntity.device?.id?.toString() ?? "";
     const memberGroups = groups.filter((g) => g.members?.some((m) => m.deviceId === deviceId));
     const controlledGroups = groups.filter((g) => g.controllerDeviceId === deviceId);
+    const linked = hasLinkedActions(deviceEntity) || Boolean(deviceEntity.linked);
 
     return (
         <section
@@ -494,6 +544,9 @@ const ShellyEntity = ({
             </p>
             <p>
                 <b>MQTT Server:</b> {deviceEntity.mqtt?.server || "N/A"}
+            </p>
+            <p>
+                <b>Linked:</b> {linked ? "Yes" : "No"}
             </p>
             {deviceEntity.verificationWarning && (
                 <p className={style.warning} title={deviceEntity.verificationWarning}>
@@ -579,9 +632,9 @@ const ShellyEntity = ({
                     <button
                         className={style["change-wifi"]}
                         onClick={openCompanionDialog}
-                        title="Make this a 3-way / companion switch for another device"
+                        title="Link Device"
                     >
-                        <FontAwesomeIcon icon={faLink} />
+                        <FontAwesomeIcon icon={faLink} /> Link Device
                     </button>
                 )}
             </p>
@@ -882,16 +935,15 @@ const ShellyEntity = ({
                 <div className={style["dialog-overlay"]} onClick={closeCompanionDialog}>
                     <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
                         <div className={style["dialog-header"]}>
-                            <h4>3-Way / Companion — {deviceEntity.name}</h4>
+                            <h4>Link Device — {deviceEntity.name}</h4>
                             <button className={style["dialog-close"]} onClick={closeCompanionDialog} aria-label="Close">
                                 <FontAwesomeIcon icon={faXmark} />
                             </button>
                         </div>
 
                         <p className={style["dialog-note"]}>
-                            Flipping <b>{deviceEntity.name}</b> will toggle the light on the target device below.
-                            The toggle is routed through the server (by device name + room), so it keeps working
-                            even if the target's IP changes. The target must have MQTT enabled.
+                            Flipping <b>{deviceEntity.name}</b> will toggle the linked target device.
+                            Targets are limited to MQTT-enabled devices in the selected room.
                         </p>
 
                         <label className={style["dialog-field"]}>
@@ -910,8 +962,8 @@ const ShellyEntity = ({
                                     <option value="">No devices found</option>
                                 ) : (
                                     companionRooms.map((room) => (
-                                        <option key={room} value={room}>
-                                            {room}
+                                        <option key={room.id} value={room.name}>
+                                            {room.name}
                                         </option>
                                     ))
                                 )}
@@ -928,7 +980,7 @@ const ShellyEntity = ({
                                 }}
                             >
                                 {companionTargets.length === 0 ? (
-                                    <option value="">No devices in this room</option>
+                                    <option value="">No MQTT-enabled devices in this room</option>
                                 ) : (
                                     companionTargets.map((d) => (
                                         <option key={d.ip} value={d.ip}>
@@ -941,7 +993,7 @@ const ShellyEntity = ({
 
                         {inputCount > 1 && (
                             <label className={style["dialog-field"]}>
-                                <span>Companion Input</span>
+                                <span>Link Input</span>
                                 <select
                                     value={selCompInput}
                                     onChange={(e) => setSelCompInput(e.target.value)}
@@ -962,7 +1014,7 @@ const ShellyEntity = ({
                                     checked={detachLocal}
                                     onChange={(e) => setDetachLocal(e.target.checked)}
                                 />
-                                <span>Detach this device's own relay (recommended for a dedicated companion)</span>
+                                <span>Detach this device's own relay (recommended for a dedicated linked input)</span>
                             </label>
                         )}
 
@@ -978,7 +1030,7 @@ const ShellyEntity = ({
                                 onClick={submitCompanion}
                                 disabled={companionSubmitting || selCompTarget === ""}
                             >
-                                {companionSubmitting ? "Linking…" : "Link Companion"}
+                                {companionSubmitting ? "Linking…" : "Link Device"}
                             </button>
                         </div>
                     </div>

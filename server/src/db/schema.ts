@@ -41,6 +41,7 @@ export const devices = pgTable('devices', {
   mqttEnable: boolean('mqtt_enable').notNull().default(false),
   mqttServer: text('mqtt_server').default(''),
   mqttTopic: text('mqtt_topic').default(''),
+  linked: boolean('linked').notNull().default(false),
   bundle: boolean('bundle').default(false),  // optional field, default false
 });
 
