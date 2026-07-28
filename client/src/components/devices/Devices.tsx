@@ -19,6 +19,7 @@ interface DeviceTile {
     displayName: string;
     inputIndex?: number;
     lockInputSelection?: boolean;
+    linkedPowerStatus?: boolean;
 }
 
 // Devices that share an MQTT topic represent a single logical switch (e.g. a
@@ -59,6 +60,26 @@ const Devices = () => {
     const [error, setError] = useState("");
 
     const buildTiles = useCallback((list: IDevice[]): DeviceTile[] => {
+        const outputBySlug = new Map<string, boolean>();
+        list.forEach((device) => {
+            outputBySlug.set(slugify(device.name || ""), Boolean(device.switchStatus?.output));
+        });
+
+        const resolveLinkedPowerStatus = (device: IDevice, inputIndex?: number): boolean | undefined => {
+            const targets = inputIndex !== undefined
+                ? device.linkedInputTargets?.[String(inputIndex)] ?? []
+                : device.linkedTargets ?? [];
+            const deviceTargets = targets
+                .filter((entry) => entry.toLowerCase().startsWith("device:"))
+                .map((entry) => slugify(entry.split(":").slice(1).join(":").trim()));
+
+            if (deviceTargets.length !== 1) {
+                return undefined;
+            }
+
+            return outputBySlug.get(deviceTargets[0]);
+        };
+
         const sorted = [...list].sort((a, b) =>
             (a?.room?.name || "Unknown").localeCompare(b?.room?.name || "Unknown", undefined, { sensitivity: "base" }) !== 0
                 ? (a?.room?.name || "Unknown").localeCompare(b?.room?.name || "Unknown", undefined, { sensitivity: "base" })
@@ -68,7 +89,11 @@ const Devices = () => {
         const tiles: DeviceTile[] = [];
         sorted.forEach((device) => {
             if (!isPlusI4(device)) {
-                tiles.push({ device, displayName: device.name });
+                tiles.push({
+                    device,
+                    displayName: device.name,
+                    linkedPowerStatus: resolveLinkedPowerStatus(device),
+                });
                 return;
             }
 
@@ -78,6 +103,7 @@ const Devices = () => {
                     displayName: `${device.name} (${inputIndex})`,
                     inputIndex,
                     lockInputSelection: true,
+                    linkedPowerStatus: resolveLinkedPowerStatus(device, inputIndex),
                 });
             }
         });
@@ -235,6 +261,7 @@ const Devices = () => {
                                 displayName={tile.displayName}
                                 inputIndex={tile.inputIndex}
                                 lockInputSelection={tile.lockInputSelection}
+                                linkedPowerStatus={tile.linkedPowerStatus}
                                 mode="normal"
                                 groups={groups}
                                 onGroupsChanged={fetchGroups}

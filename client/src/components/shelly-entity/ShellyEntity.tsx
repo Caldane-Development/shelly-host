@@ -84,6 +84,7 @@ const ShellyEntity = ({
     displayName,
     inputIndex,
     lockInputSelection,
+    linkedPowerStatus,
     mode,
     groups = [],
     onGroupsChanged,
@@ -93,6 +94,7 @@ const ShellyEntity = ({
     displayName?: string;
     inputIndex?: number;
     lockInputSelection?: boolean;
+    linkedPowerStatus?: boolean;
     mode: string;
     groups?: DeviceGroup[];
     onGroupsChanged?: () => void;
@@ -536,6 +538,7 @@ const ShellyEntity = ({
         : linked
             ? "Linked target details not loaded in this view"
             : "Not linked";
+    const powerStatus = linked ? (linkedPowerStatus ?? switchState) : switchState;
 
     const triggerLinked = async () => {
         try {
@@ -610,8 +613,8 @@ const ShellyEntity = ({
                     </button>
                 )}
                 {(deviceEntity.mqtt?.enable || linked) && (
-                    <button onClick={() => (linked ? triggerLinked() : togglePower(deviceEntity))}>
-                        <FontAwesomeIcon icon={faPowerOff} data-status={deviceEntity.switchStatus.output} />
+                    <button className={style["power-button"]} onClick={() => (linked ? triggerLinked() : togglePower(deviceEntity))}>
+                        <FontAwesomeIcon icon={faPowerOff} data-status={powerStatus} />
                     </button>
                 )}
                 {mode === "normal" && !deviceEntity.mqtt?.enable && (
