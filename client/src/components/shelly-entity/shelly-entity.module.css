@@ -120,11 +120,11 @@ button.change-wifi {
     font-size: 0.85rem;
 }
 
-button.power-button {
+section.shelly-entity button.power-button {
     background: #555657;
 }
 
-button.power-button:has([data-status="true"]) {
+section.shelly-entity button.power-button:has([data-status="true"]) {
     background-color: rgb(255, 0, 157);
 }
 
