@@ -476,21 +476,8 @@ const ShellyEntity = ({
         }
     };
 
-    // Trigger a switch group this device controls, straight from its card.
-    const triggerGroup = async (groupId: number) => {
-        try {
-            const response = await fetch(`${BACKEND_URL}/group/${groupId}/trigger`, { method: "POST" });
-            if (!response.ok) {
-                throw new Error(`Request failed: ${response.status}`);
-            }
-        } catch (err) {
-            console.error("Failed to trigger group", err);
-        }
-    };
-
     // Groups this device relates to, derived from the parent-provided list.
     const deviceId = deviceEntity.device?.id?.toString() ?? "";
-    const memberGroups = groups.filter((g) => g.members?.some((m) => m.deviceId === deviceId));
     const controlledGroups = groups.filter((g) => g.controllerDeviceId === deviceId);
     const persistedInputTargets = deviceEntity.linkedInputTargets?.[String(resolvedInputIndex)] ?? [];
     const linkedByHooks = hasLinkedActions(deviceEntity, isInputTile ? resolvedInputIndex : undefined);
@@ -550,6 +537,23 @@ const ShellyEntity = ({
             ? "Linked target details not loaded in this view"
             : "Not linked";
 
+    const triggerLinked = async () => {
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/${deviceEntity.ip}/linked-trigger`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ inputId: resolvedInputIndex }),
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.error || `Request failed: ${response.status}`);
+            }
+        } catch (err) {
+            console.error("Failed to trigger linked action", err);
+            alert(err instanceof Error ? err.message : "Could not trigger linked action.");
+        }
+    };
+
     return (
         <section
             className={style["shelly-entity"]}
@@ -599,45 +603,14 @@ const ShellyEntity = ({
             <p>
                 <b title={linkedTitle}>Linked:</b> <span title={linkedTitle}>{linked ? "Yes" : "No"}</span>
             </p>
-            {(memberGroups.length > 0 || controlledGroups.length > 0) && (
-                <div className={style.groups}>
-                    {controlledGroups.length > 0 && (
-                        <p className={style["group-line"]}>
-                            <b>Controls:</b>
-                            {controlledGroups.map((group) => (
-                                <span key={group.id} className={style["group-tag"]}>
-                                    {group.name}
-                                    <button
-                                        className={style["group-trigger"]}
-                                        title={`Trigger ${group.name}`}
-                                        onClick={() => triggerGroup(group.id)}
-                                    >
-                                        <FontAwesomeIcon icon={faPowerOff} />
-                                    </button>
-                                </span>
-                            ))}
-                        </p>
-                    )}
-                    {memberGroups.length > 0 && (
-                        <p className={style["group-line"]}>
-                            <b>Member of:</b>
-                            {memberGroups.map((group) => (
-                                <span key={group.id} className={style["group-tag"]}>
-                                    {group.name}
-                                </span>
-                            ))}
-                        </p>
-                    )}
-                </div>
-            )}
             <p>
                 {(mode == "debug" || mode == "dev") && (
                     <button onClick={() => handleMqtt(deviceEntity)}>
                         <b>MQTT:</b> {deviceEntity.mqtt?.enable.toString()}
                     </button>
                 )}
-                {deviceEntity.mqtt?.enable && (
-                    <button onClick={() => togglePower(deviceEntity)}>
+                {(deviceEntity.mqtt?.enable || linked) && (
+                    <button onClick={() => (linked ? triggerLinked() : togglePower(deviceEntity))}>
                         <FontAwesomeIcon icon={faPowerOff} data-status={deviceEntity.switchStatus.output} />
                     </button>
                 )}

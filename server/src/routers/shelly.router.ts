@@ -1885,6 +1885,66 @@ shellyRouter.post("/:ip/companion", async (req: Request, res: Response) => {
     res.json({ ip, targetIp, targetName: target.name, targetRoomId: target.room.id, inputId, detach, webhooks });
 });
 
+shellyRouter.post("/:ip/linked-trigger", async (req: Request, res: Response) => {
+    const ip = req.params.ip;
+    const inputId = Number(req.body?.inputId ?? 0);
+
+    if (!Number.isInteger(inputId) || inputId < 0) {
+        res.status(400).json({ error: "inputId must be a non-negative integer" });
+        return;
+    }
+
+    const webhooks = await shellyWebhookList(ip);
+    const hooks = webhooks?.result?.hooks ?? [];
+
+    const candidateUrls = hooks
+        .filter((hook) => hook.enable !== false && Number(hook.cid ?? 0) === inputId)
+        .flatMap((hook) => hook.urls ?? []);
+
+    const parseTargetKey = (url: string): string | null => {
+        const groupMatch = url.match(/\/api\/group\/(\d+)\/trigger/i);
+        if (groupMatch) {
+            return `group:${groupMatch[1]}`;
+        }
+
+        const messageMatch = url.match(/\/api\/message\/srd\/[^/]+\/\d+\/([^/]+)\/switch\/message\/toggle\//i);
+        if (messageMatch) {
+            return `device:${(messageMatch[1] || "").toLowerCase()}`;
+        }
+
+        return null;
+    };
+
+    const targetKeys = [...new Set(candidateUrls.map(parseTargetKey).filter((value): value is string => Boolean(value)))];
+    if (targetKeys.length === 0) {
+        res.status(404).json({ error: "No linked target found for this input." });
+        return;
+    }
+
+    if (targetKeys.length > 1) {
+        res.status(409).json({
+            error: "Multiple linked targets detected for this input. Use a switch group for fan-out behavior.",
+            targets: targetKeys,
+        });
+        return;
+    }
+
+    const targetKey = targetKeys[0];
+    const triggerUrl = candidateUrls.find((url) => parseTargetKey(url) === targetKey);
+    if (!triggerUrl) {
+        res.status(404).json({ error: "No trigger URL found for linked target." });
+        return;
+    }
+
+    const triggerResponse = await fetch(triggerUrl, { method: "GET" });
+    if (!triggerResponse.ok) {
+        res.status(502).json({ error: `Linked trigger failed with status ${triggerResponse.status}` });
+        return;
+    }
+
+    res.json({ ok: true, ip, inputId, target: targetKey });
+});
+
 shellyRouter.post("/:ip/wifi", async (req: Request, res: Response) => {
     const ip = req.params.ip;
     const ssid: string = (req.body.ssid || "").trim();
