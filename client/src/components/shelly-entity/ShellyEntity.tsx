@@ -56,17 +56,12 @@ interface WifiCredential {
     password: string;
 }
 
-interface GroupOption {
-    id: number;
-    name: string;
-    controllerDeviceId: string | null;
-    members?: { deviceId: string }[];
-}
-
 interface StoredRoom {
     id: number;
     name: string;
 }
+
+const GROUPS_ROOM_VALUE = "__groups__";
 
 export interface DeviceGroup {
     id: number;
@@ -116,20 +111,13 @@ const ShellyEntity = ({
     const [wifiDialogError, setWifiDialogError] = useState("");
     const [wifiSubmitting, setWifiSubmitting] = useState(false);
 
-    // Group-controller dialog state
-    const [showGroupDialog, setShowGroupDialog] = useState(false);
-    const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
-    const [selGroup, setSelGroup] = useState<string>("");
-    const [selInput, setSelInput] = useState<string>("0");
-    const [groupDialogError, setGroupDialogError] = useState("");
-    const [groupSubmitting, setGroupSubmitting] = useState(false);
-
-    // Companion (3-way) dialog state
+    // Link Device dialog state
     const [showCompanionDialog, setShowCompanionDialog] = useState(false);
     const [companionDevices, setCompanionDevices] = useState<IDevice[]>([]);
     const [companionRooms, setCompanionRooms] = useState<StoredRoom[]>([]);
     const [selCompRoom, setSelCompRoom] = useState<string>("");
     const [selCompTarget, setSelCompTarget] = useState<string>("");
+    const [selCompGroup, setSelCompGroup] = useState<string>("");
     const [selCompInput, setSelCompInput] = useState<string>("0");
     const [detachLocal, setDetachLocal] = useState(true);
     const [companionError, setCompanionError] = useState("");
@@ -346,68 +334,6 @@ const ShellyEntity = ({
         }
     };
 
-    // Assign this device as the controller of a switch group. A physical event
-    // on the device (button toggle) then triggers the whole group. The backend
-    // installs the on/off webhooks on the device.
-    const openGroupDialog = async () => {
-        setGroupDialogError("");
-        setShowGroupDialog(true);
-        try {
-            const response = await fetch(`${BACKEND_URL}/group`);
-            const groups: GroupOption[] = response.ok ? await response.json() : [];
-            setGroupOptions(groups);
-            // Preselect a group this device already controls, if any.
-            const deviceId = deviceEntity.device?.id?.toString() ?? "";
-            const owned = groups.find((g) => g.controllerDeviceId === deviceId);
-            setSelGroup(owned ? String(owned.id) : groups[0] ? String(groups[0].id) : "");
-        } catch (err) {
-            console.error("Failed to load groups", err);
-            setGroupDialogError("Could not load switch groups from the server.");
-        }
-    };
-
-    const closeGroupDialog = () => {
-        setShowGroupDialog(false);
-        setGroupDialogError("");
-    };
-
-    const submitGroupController = async () => {
-        if (selGroup === "") {
-            setGroupDialogError("Choose a switch group.");
-            return;
-        }
-        const deviceId = deviceEntity.device?.id?.toString();
-        if (!deviceId) {
-            setGroupDialogError("This device has no id; re-run the scanner first.");
-            return;
-        }
-
-        setGroupSubmitting(true);
-        setGroupDialogError("");
-        try {
-            const response = await fetch(`${BACKEND_URL}/group/${selGroup}/controller`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ deviceId, inputId: Number(selInput) }),
-            });
-            if (!response.ok) {
-                throw new Error(`Request failed: ${response.status}`);
-            }
-            closeGroupDialog();
-            const groupName = groupOptions.find((g) => String(g.id) === selGroup)?.name ?? selGroup;
-            onGroupsChanged?.();
-            setDeviceEntity((prev) => ({ ...prev, linked: true }));
-            alert(`${deviceEntity.name} is now the controller for "${groupName}".`);
-        } catch (err) {
-            console.error("Failed to assign group controller", err);
-            setGroupDialogError(
-                "Could not assign this device as controller. Make sure it was picked up by a recent scan."
-            );
-        } finally {
-            setGroupSubmitting(false);
-        }
-    };
-
     const openCompanionDialog = async () => {
         setCompanionError("");
         setDetachLocal(hasLocalRelay);
@@ -425,13 +351,16 @@ const ShellyEntity = ({
             // MQTT-enabled targets so we never need an RPC fallback path.
             const targets = devices.filter((d) => d.ip && d.ip !== deviceEntity.ip && Boolean(d.mqtt?.enable));
             setCompanionDevices(targets);
-            setCompanionRooms(rooms);
+            const sortedRooms = [...rooms].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+            setCompanionRooms(sortedRooms);
 
             const preferredRoom = deviceEntity.room?.name ?? "";
-            const firstRoom = rooms.find((room) => room.name === preferredRoom)?.name || rooms[0]?.name || "";
+            const firstRoom = sortedRooms.find((room) => room.name === preferredRoom)?.name || sortedRooms[0]?.name || "";
             setSelCompRoom(firstRoom);
             const firstTarget = targets.find((d) => (d.room?.name ?? "") === firstRoom);
             setSelCompTarget(firstTarget?.ip ?? "");
+            const sortedGroups = [...groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+            setSelCompGroup(sortedGroups[0] ? String(sortedGroups[0].id) : "");
         } catch (err) {
             console.error("Failed to load devices", err);
             setCompanionError("Could not load devices from the server.");
@@ -444,30 +373,59 @@ const ShellyEntity = ({
     };
 
     const submitCompanion = async () => {
-        if (selCompTarget === "") {
+        const linkingToGroup = selCompRoom === GROUPS_ROOM_VALUE;
+        if (linkingToGroup) {
+            if (selCompGroup === "") {
+                setCompanionError("Choose a switch group.");
+                return;
+            }
+        } else if (selCompTarget === "") {
             setCompanionError("Choose a target device.");
             return;
         }
         setCompanionSubmitting(true);
         setCompanionError("");
         try {
-            const response = await fetch(`${BACKEND_URL}/shelly/${deviceEntity.ip}/companion`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    targetIp: selCompTarget,
-                    inputId: Number(selCompInput),
-                    detach: detachLocal,
-                }),
-            });
-            if (!response.ok) {
-                throw new Error(`Request failed: ${response.status}`);
+            if (linkingToGroup) {
+                const deviceId = deviceEntity.device?.id?.toString();
+                if (!deviceId) {
+                    setCompanionError("This device has no id; re-run the scanner first.");
+                    return;
+                }
+                const response = await fetch(`${BACKEND_URL}/group/${selCompGroup}/controller`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ deviceId, inputId: Number(selCompInput) }),
+                });
+                if (!response.ok) {
+                    throw new Error(`Request failed: ${response.status}`);
+                }
+
+                const groupName = groups.find((g) => String(g.id) === selCompGroup)?.name ?? selCompGroup;
+                closeCompanionDialog();
+                onGroupsChanged?.();
+                setDeviceEntity((prev) => ({ ...prev, linked: true }));
+                alert(`${deviceEntity.name} now links to switch group "${groupName}".`);
+            } else {
+                const response = await fetch(`${BACKEND_URL}/shelly/${deviceEntity.ip}/companion`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        targetIp: selCompTarget,
+                        inputId: Number(selCompInput),
+                        detach: detachLocal,
+                    }),
+                });
+                if (!response.ok) {
+                    throw new Error(`Request failed: ${response.status}`);
+                }
+
+                const targetName =
+                    companionDevices.find((d) => d.ip === selCompTarget)?.name ?? selCompTarget;
+                closeCompanionDialog();
+                setDeviceEntity((prev) => ({ ...prev, linked: true }));
+                alert(`${deviceEntity.name} (input ${selCompInput}) now links to "${targetName}".`);
             }
-            const targetName =
-                companionDevices.find((d) => d.ip === selCompTarget)?.name ?? selCompTarget;
-            closeCompanionDialog();
-            setDeviceEntity((prev) => ({ ...prev, linked: true }));
-            alert(`${deviceEntity.name} (input ${selCompInput}) now links to "${targetName}".`);
         } catch (err) {
             console.error("Failed to link companion switch", err);
             setCompanionError(
@@ -479,6 +437,11 @@ const ShellyEntity = ({
     };
 
     const companionTargets = companionDevices.filter((d) => (d.room?.name ?? "") === selCompRoom);
+    const sortedGroups = [...groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const roomChoices = [
+        ...companionRooms.map((room) => ({ value: room.name, label: room.name })),
+        { value: GROUPS_ROOM_VALUE, label: "Groups" },
+    ].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
 
     // Devices that share a topic (e.g. a 3-way pairing) all react to the same
     // message, so this drives the whole logical switch rather than one relay.
@@ -622,19 +585,10 @@ const ShellyEntity = ({
                 {mode === "normal" && (
                     <button
                         className={style["change-wifi"]}
-                        onClick={openGroupDialog}
-                        title="Assign this device as a switch-group controller"
-                    >
-                        <FontAwesomeIcon icon={faObjectGroup} />
-                    </button>
-                )}
-                {mode === "normal" && (
-                    <button
-                        className={style["change-wifi"]}
                         onClick={openCompanionDialog}
                         title="Link Device"
                     >
-                        <FontAwesomeIcon icon={faLink} /> Link Device
+                        <FontAwesomeIcon icon={faLink} />
                     </button>
                 )}
             </p>
@@ -859,78 +813,6 @@ const ShellyEntity = ({
                     </div>
                 </div>
             )}
-            {showGroupDialog && (
-                <div className={style["dialog-overlay"]} onClick={closeGroupDialog}>
-                    <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
-                        <div className={style["dialog-header"]}>
-                            <h4>Group Controller — {deviceEntity.name}</h4>
-                            <button className={style["dialog-close"]} onClick={closeGroupDialog} aria-label="Close">
-                                <FontAwesomeIcon icon={faXmark} />
-                            </button>
-                        </div>
-
-                        <p className={style["dialog-note"]}>
-                            A physical event on <b>{deviceEntity.name}</b> will toggle the selected switch group.
-                            The device's on/off webhooks are installed automatically.
-                        </p>
-
-                        <label className={style["dialog-field"]}>
-                            <span>Switch Group</span>
-                            <select
-                                value={selGroup}
-                                onChange={(e) => {
-                                    setSelGroup(e.target.value);
-                                    if (groupDialogError) setGroupDialogError("");
-                                }}
-                            >
-                                {groupOptions.length === 0 ? (
-                                    <option value="">No switch groups</option>
-                                ) : (
-                                    groupOptions.map((group) => (
-                                        <option key={group.id} value={String(group.id)}>
-                                            {group.name}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                        </label>
-
-                        <label className={style["dialog-field"]}>
-                            <span>Trigger Input</span>
-                            <select
-                                value={selInput}
-                                onChange={(e) => setSelInput(e.target.value)}
-                            >
-                                {[0, 1, 2, 3].map((n) => (
-                                    <option key={n} value={String(n)}>
-                                        Input {n}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-
-                        {groupOptions.length === 0 && (
-                            <p className={style["dialog-note"]}>Create a switch group first on the Switch Groups page.</p>
-                        )}
-
-                        {groupDialogError && <p className={style.error}>{groupDialogError}</p>}
-
-                        <div className={style["dialog-actions"]}>
-                            <button type="button" className={style["dialog-cancel"]} onClick={closeGroupDialog} disabled={groupSubmitting}>
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className={style["dialog-submit"]}
-                                onClick={submitGroupController}
-                                disabled={groupSubmitting || groupOptions.length === 0}
-                            >
-                                {groupSubmitting ? "Assigning…" : "Set as Controller"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
             {showCompanionDialog && (
                 <div className={style["dialog-overlay"]} onClick={closeCompanionDialog}>
                     <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
@@ -943,7 +825,8 @@ const ShellyEntity = ({
 
                         <p className={style["dialog-note"]}>
                             Flipping <b>{deviceEntity.name}</b> will toggle the linked target device.
-                            Targets are limited to MQTT-enabled devices in the selected room.
+                            Pick a room to link to an MQTT-enabled target device, or choose Groups to link this
+                            input as a switch-group controller.
                         </p>
 
                         <label className={style["dialog-field"]}>
@@ -953,43 +836,71 @@ const ShellyEntity = ({
                                 onChange={(e) => {
                                     const room = e.target.value;
                                     setSelCompRoom(room);
-                                    const first = companionDevices.find((d) => (d.room?.name ?? "") === room);
-                                    setSelCompTarget(first?.ip ?? "");
+                                    if (room === GROUPS_ROOM_VALUE) {
+                                        setSelCompTarget("");
+                                        setSelCompGroup(sortedGroups[0] ? String(sortedGroups[0].id) : "");
+                                    } else {
+                                        const first = companionDevices.find((d) => (d.room?.name ?? "") === room);
+                                        setSelCompTarget(first?.ip ?? "");
+                                    }
                                     if (companionError) setCompanionError("");
                                 }}
                             >
-                                {companionRooms.length === 0 ? (
+                                {roomChoices.length === 0 ? (
                                     <option value="">No devices found</option>
                                 ) : (
-                                    companionRooms.map((room) => (
-                                        <option key={room.id} value={room.name}>
-                                            {room.name}
+                                    roomChoices.map((room) => (
+                                        <option key={room.value} value={room.value}>
+                                            {room.label}
                                         </option>
                                     ))
                                 )}
                             </select>
                         </label>
 
-                        <label className={style["dialog-field"]}>
-                            <span>Target Device</span>
-                            <select
-                                value={selCompTarget}
-                                onChange={(e) => {
-                                    setSelCompTarget(e.target.value);
-                                    if (companionError) setCompanionError("");
-                                }}
-                            >
-                                {companionTargets.length === 0 ? (
-                                    <option value="">No MQTT-enabled devices in this room</option>
-                                ) : (
-                                    companionTargets.map((d) => (
-                                        <option key={d.ip} value={d.ip}>
-                                            {d.name} ({d.ip})
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                        </label>
+                        {selCompRoom === GROUPS_ROOM_VALUE ? (
+                            <label className={style["dialog-field"]}>
+                                <span>Switch Group</span>
+                                <select
+                                    value={selCompGroup}
+                                    onChange={(e) => {
+                                        setSelCompGroup(e.target.value);
+                                        if (companionError) setCompanionError("");
+                                    }}
+                                >
+                                    {sortedGroups.length === 0 ? (
+                                        <option value="">No switch groups</option>
+                                    ) : (
+                                        sortedGroups.map((group) => (
+                                            <option key={group.id} value={String(group.id)}>
+                                                {group.name}
+                                            </option>
+                                        ))
+                                    )}
+                                </select>
+                            </label>
+                        ) : (
+                            <label className={style["dialog-field"]}>
+                                <span>Target Device</span>
+                                <select
+                                    value={selCompTarget}
+                                    onChange={(e) => {
+                                        setSelCompTarget(e.target.value);
+                                        if (companionError) setCompanionError("");
+                                    }}
+                                >
+                                    {companionTargets.length === 0 ? (
+                                        <option value="">No MQTT-enabled devices in this room</option>
+                                    ) : (
+                                        companionTargets.map((d) => (
+                                            <option key={d.ip} value={d.ip}>
+                                                {d.name} ({d.ip})
+                                            </option>
+                                        ))
+                                    )}
+                                </select>
+                            </label>
+                        )}
 
                         {inputCount > 1 && (
                             <label className={style["dialog-field"]}>
@@ -1007,7 +918,7 @@ const ShellyEntity = ({
                             </label>
                         )}
 
-                        {hasLocalRelay && (
+                        {hasLocalRelay && selCompRoom !== GROUPS_ROOM_VALUE && (
                             <label className={style["dialog-check"]}>
                                 <input
                                     type="checkbox"
@@ -1028,7 +939,10 @@ const ShellyEntity = ({
                                 type="button"
                                 className={style["dialog-submit"]}
                                 onClick={submitCompanion}
-                                disabled={companionSubmitting || selCompTarget === ""}
+                                disabled={
+                                    companionSubmitting ||
+                                    (selCompRoom === GROUPS_ROOM_VALUE ? selCompGroup === "" : selCompTarget === "")
+                                }
                             >
                                 {companionSubmitting ? "Linking…" : "Link Device"}
                             </button>
