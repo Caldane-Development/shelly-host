@@ -7,6 +7,12 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Force deploy even if this commit already deployed successfully"
+        required: false
+        default: false
+        type: boolean
 
 # Never run two production deploys at once; queue instead of cancelling a
 # deploy that is mid-flight.
@@ -42,7 +48,51 @@ jobs:
           SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
           echo "tag=${SHA:0:12}" >> "$GITHUB_OUTPUT"
 
+      - id: dedupe
+        name: Skip duplicate successful deploys
+        uses: actions/github-script@v7
+        env:
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          FORCE_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force || 'false' }}
+        with:
+          script: |
+            const targetSha = process.env.TARGET_SHA;
+            const force = String(process.env.FORCE_DEPLOY || "false").toLowerCase() === "true";
+
+            if (force) {
+              core.notice(`force=true: skipping duplicate-deploy guard for ${targetSha}`);
+              core.setOutput("skip", "false");
+              return;
+            }
+
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "deploy.yml",
+              branch: "main",
+              per_page: 100,
+            });
+
+            const duplicate = runs.find((run) =>
+              run.id !== context.runId &&
+              run.head_sha === targetSha &&
+              run.status === "completed" &&
+              run.conclusion === "success"
+            );
+
+            if (duplicate) {
+              core.notice(
+                `Duplicate deploy detected for ${targetSha}; already succeeded in run ${duplicate.id}. Skipping.`
+              );
+              core.setOutput("skip", "true");
+              return;
+            }
+
+            core.notice(`No successful prior deploy for ${targetSha}; continuing.`);
+            core.setOutput("skip", "false");
+
       - name: Build & push server image
+        if: steps.dedupe.outputs.skip != 'true'
         run: |
           docker build \
             -t "$SERVER_IMAGE:latest" \
@@ -52,6 +102,7 @@ jobs:
           docker push "$SERVER_IMAGE:${{ steps.meta.outputs.tag }}"
 
       - name: Build & push client image
+        if: steps.dedupe.outputs.skip != 'true'
         run: |
           docker build \
             --target runtime \
@@ -64,6 +115,7 @@ jobs:
           docker push "$CLIENT_IMAGE:${{ steps.meta.outputs.tag }}"
 
       - name: Build & push proxy image
+        if: steps.dedupe.outputs.skip != 'true'
         run: |
           docker build \
             -t "$PROXY_IMAGE:latest" \
@@ -73,6 +125,7 @@ jobs:
           docker push "$PROXY_IMAGE:${{ steps.meta.outputs.tag }}"
 
       - name: Deploy stack
+        if: steps.dedupe.outputs.skip != 'true'
         # The runner user (github) can build & push to the local registry, but
         # the stack itself runs under the github-runner account on the prod host
         # (same box, 10.10.10.28). Deploy over SSH like Soonercon/programming-
@@ -117,3 +170,8 @@ jobs:
             docker image prune -f || true
             docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
           EOF
+
+      - name: Duplicate deploy skipped
+        if: steps.dedupe.outputs.skip == 'true'
+        run: |
+          echo "Skipping deploy because this commit already has a successful deploy run."
