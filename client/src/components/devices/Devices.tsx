@@ -23,6 +23,11 @@ interface DeviceTile {
     linkedPowerStatus?: boolean;
 }
 
+interface LinkedTargetRef {
+    slug: string;
+    roomId?: string;
+}
+
 // Devices that share an MQTT topic represent a single logical switch (e.g. a
 // 3-way pairing). The "owner" is the device whose name matches the device slug
 // embedded in the topic (`{site}/{room}/{device-slug}/switch`); its state is
@@ -62,12 +67,18 @@ const Devices = () => {
 
     const buildTiles = useCallback((list: IDevice[]): DeviceTile[] => {
         const outputBySlug = new Map<string, boolean>();
+        const outputByRoomAndSlug = new Map<string, boolean>();
         list.forEach((device) => {
-            outputBySlug.set(slugify(device.name || ""), Boolean(device.switchStatus?.output));
+            const slug = slugify(device.name || "");
+            const roomId = device.room?.id != null ? String(device.room.id) : undefined;
+            outputBySlug.set(slug, Boolean(device.switchStatus?.output));
+            if (roomId) {
+                outputByRoomAndSlug.set(`${roomId}:${slug}`, Boolean(device.switchStatus?.output));
+            }
         });
 
-        const collectWebhookDeviceTargets = (device: IDevice, inputIndex?: number): string[] => {
-            const targets = new Set<string>();
+        const collectWebhookDeviceTargets = (device: IDevice, inputIndex?: number): LinkedTargetRef[] => {
+            const targets = new Map<string, LinkedTargetRef>();
             const hooks = device.webhooks?.result?.hooks ?? [];
             const sourceSlug = slugify(device.name || "");
 
@@ -80,33 +91,46 @@ const Devices = () => {
                     if (!match) {
                         return;
                     }
+                    const targetRoomId = match[1] || undefined;
                     const targetSlug = slugify(match[2] || "");
                     if (targetSlug && targetSlug !== sourceSlug) {
-                        targets.add(targetSlug);
+                        const key = targetRoomId ? `${targetRoomId}:${targetSlug}` : targetSlug;
+                        targets.set(key, { slug: targetSlug, roomId: targetRoomId });
                     }
                 });
             });
 
-            return [...targets];
+            return [...targets.values()];
         };
 
         const resolveLinkedPowerStatus = (device: IDevice, inputIndex?: number): boolean | undefined => {
             const persistedTargets = inputIndex !== undefined
                 ? device.linkedInputTargets?.[String(inputIndex)] ?? []
                 : device.linkedTargets ?? [];
-            const deviceTargets = persistedTargets
+
+            const persistedDeviceTargets: LinkedTargetRef[] = persistedTargets
                 .filter((entry) => entry.toLowerCase().startsWith("device:"))
-                .map((entry) => slugify(entry.split(":").slice(1).join(":").trim()));
+                .map((entry) => ({ slug: slugify(entry.split(":").slice(1).join(":").trim()) }));
 
             const webhookTargets = collectWebhookDeviceTargets(device, inputIndex);
-            const targetCandidates = new Set<string>([...deviceTargets, ...webhookTargets]);
+            const targetCandidates = new Map<string, LinkedTargetRef>();
+            [...persistedDeviceTargets, ...webhookTargets].forEach((target) => {
+                if (!target.slug) {
+                    return;
+                }
+                const key = target.roomId ? `${target.roomId}:${target.slug}` : target.slug;
+                targetCandidates.set(key, target);
+            });
 
             if (targetCandidates.size !== 1) {
                 return undefined;
             }
 
-            const [targetSlug] = [...targetCandidates];
-            return outputBySlug.get(targetSlug);
+            const [target] = [...targetCandidates.values()];
+            if (target.roomId) {
+                return outputByRoomAndSlug.get(`${target.roomId}:${target.slug}`);
+            }
+            return outputBySlug.get(target.slug);
         };
 
         const sorted = [...list].sort((a, b) =>
@@ -295,6 +319,7 @@ const Devices = () => {
                                 groups={groups}
                                 onGroupsChanged={fetchGroups}
                                 onDeviceUpdated={handleDeviceUpdated}
+                                onStatusRefresh={fetchStatuses}
                             />
                         ))}
                 </div>

@@ -89,6 +89,7 @@ const ShellyEntity = ({
     groups = [],
     onGroupsChanged,
     onDeviceUpdated,
+    onStatusRefresh,
 }: {
     device: IDevice;
     displayName?: string;
@@ -99,6 +100,7 @@ const ShellyEntity = ({
     groups?: DeviceGroup[];
     onGroupsChanged?: () => void;
     onDeviceUpdated?: (device: IDevice) => void;
+    onStatusRefresh?: () => void;
 }) => {
     const [deviceEntity, setDeviceEntity] = useState(device);
     const [deviceName, setDeviceName] = useState(device.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
@@ -538,7 +540,7 @@ const ShellyEntity = ({
         : linked
             ? "Linked target details not loaded in this view"
             : "Not linked";
-    const powerStatus = linked ? (linkedPowerStatus ?? switchState) : switchState;
+    const powerStatus = linked ? Boolean(linkedPowerStatus) : switchState;
 
     const triggerLinked = async () => {
         try {
@@ -551,6 +553,7 @@ const ShellyEntity = ({
                 const payload = await response.json().catch(() => null);
                 throw new Error(payload?.error || `Request failed: ${response.status}`);
             }
+            onStatusRefresh?.();
         } catch (err) {
             console.error("Failed to trigger linked action", err);
             alert(err instanceof Error ? err.message : "Could not trigger linked action.");
