@@ -11,6 +11,39 @@ import { Webhooks } from "../../../common/models/webhooks.interface";
 import { createWebhookConfig, createGroupWebhookConfig, createCompanionWebhookConfig } from "./webhook.helper";
 import { getSiteConfigCached } from "./site-config.helper";
 
+interface ShellyRpcRequestOptions {
+    retries?: number;
+    delayMs?: number;
+    timeoutMs?: number;
+    connectionHeader?: "keep-alive" | "close";
+}
+
+interface ShellyRpcError {
+    code: number;
+    message: string;
+}
+
+interface ShellyUpdateInfo {
+    version?: string;
+    build_id?: string;
+    [key: string]: unknown;
+}
+
+interface ShellyUpdateCheckResult {
+    stable?: ShellyUpdateInfo;
+    beta?: ShellyUpdateInfo;
+    alt?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+
+interface ShellyRpcResponse<T = Record<string, unknown>> {
+    id: number | string;
+    src: string;
+    dst: string;
+    result?: T;
+    error?: ShellyRpcError;
+}
+
 
 export const discoverShelly = async (ip: string): Promise<ShellyStatusResult | null> => {
     const options = {
@@ -287,13 +320,18 @@ export const shellySetSwitch = async (ip: string, on: boolean, channel: number =
     return false;
 };
 
-export const shellyReboot = async (ip: string): Promise<any> => {
+export const shellyReboot = async (ip: string, requestOptions?: ShellyRpcRequestOptions): Promise<any> => {
     const options = {
         body: {
             id: 0,
             method: "Shelly.Reboot",
         },
     };
+
+    const retries = requestOptions?.retries ?? 3;
+    const delayMs = requestOptions?.delayMs ?? 1000;
+    const timeoutMs = requestOptions?.timeoutMs ?? 7000;
+    const connectionHeader = requestOptions?.connectionHeader ?? "keep-alive";
 
     try {
         const postResponse = await postRequest<{}>(
@@ -303,9 +341,12 @@ export const shellyReboot = async (ip: string): Promise<any> => {
                 "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
                 Accept: "application/json",
                 "User-Agent": "ShellyApp/1.0",
-                Connection: "keep-alive",
+                Connection: connectionHeader,
             },
-            options.body
+            options.body,
+            retries,
+            delayMs,
+            timeoutMs
         );
         return postResponse;
     } catch (error: Error | any) {
@@ -313,6 +354,96 @@ export const shellyReboot = async (ip: string): Promise<any> => {
     }
 
     return null;
+};
+
+export const shellyCheckForUpdate = async (
+    ip: string,
+    requestOptions?: ShellyRpcRequestOptions
+): Promise<ShellyUpdateCheckResult | null> => {
+    const options = {
+        body: {
+            id: 0,
+            method: "Shelly.CheckForUpdate",
+        },
+    };
+
+    const retries = requestOptions?.retries ?? 3;
+    const delayMs = requestOptions?.delayMs ?? 1000;
+    const timeoutMs = requestOptions?.timeoutMs ?? 10000;
+    const connectionHeader = requestOptions?.connectionHeader ?? "close";
+
+    try {
+        const response = await postRequest<ShellyRpcResponse<ShellyUpdateCheckResult>>(
+            `http://${ip}/rpc/`,
+            {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
+                Accept: "application/json",
+                "User-Agent": "ShellyApp/1.0",
+                Connection: connectionHeader,
+            },
+            options.body,
+            retries,
+            delayMs,
+            timeoutMs
+        );
+
+        if (response.error) {
+            logger.info(`[server]: CheckForUpdate RPC error on device at ${ip}. Error: ${response.error.message}`);
+            return null;
+        }
+
+        return response.result ?? {};
+    } catch (error: Error | any) {
+        logger.info(`[server]: Failed to check for firmware updates on device at ${ip}. Error: ${error.message}`);
+        return null;
+    }
+};
+
+export const shellyUpdateFirmware = async (
+    ip: string,
+    stage: "stable" | "beta" = "stable",
+    requestOptions?: ShellyRpcRequestOptions
+): Promise<{ ok: boolean; message?: string }> => {
+    const options = {
+        body: {
+            id: 0,
+            method: "Shelly.Update",
+            params: {
+                stage,
+            },
+        },
+    };
+
+    const retries = requestOptions?.retries ?? 2;
+    const delayMs = requestOptions?.delayMs ?? 1000;
+    const timeoutMs = requestOptions?.timeoutMs ?? 12000;
+    const connectionHeader = requestOptions?.connectionHeader ?? "close";
+
+    try {
+        const response = await postRequest<ShellyRpcResponse<null>>(
+            `http://${ip}/rpc/`,
+            {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
+                Accept: "application/json",
+                "User-Agent": "ShellyApp/1.0",
+                Connection: connectionHeader,
+            },
+            options.body,
+            retries,
+            delayMs,
+            timeoutMs
+        );
+
+        if (response.error) {
+            return { ok: false, message: response.error.message || "Shelly.Update RPC error" };
+        }
+
+        return { ok: true };
+    } catch (error: Error | any) {
+        return { ok: false, message: error.message || "Failed to start firmware update" };
+    }
 };
 
 export const shellyGetMqttSettings = async (ip: string): Promise<any> => {
@@ -343,13 +474,18 @@ export const shellyGetMqttSettings = async (ip: string): Promise<any> => {
     return null;
 };
 
-export const shellyWebhookList = async (ip: string): Promise<Webhooks | null> => {
+export const shellyWebhookList = async (ip: string, requestOptions?: ShellyRpcRequestOptions): Promise<Webhooks | null> => {
     const options = {
         body: {
             id: ip,
             method: "Webhook.List",
         },
     };
+
+    const retries = requestOptions?.retries ?? 3;
+    const delayMs = requestOptions?.delayMs ?? 1000;
+    const timeoutMs = requestOptions?.timeoutMs ?? 7000;
+    const connectionHeader = requestOptions?.connectionHeader ?? "keep-alive";
 
     try {
         const postResponse = await postRequest<Webhooks>(
@@ -359,9 +495,12 @@ export const shellyWebhookList = async (ip: string): Promise<Webhooks | null> =>
                 "Content-Length": Buffer.byteLength(JSON.stringify(options.body)),
                 Accept: "application/json",
                 "User-Agent": "ShellyApp/1.0",
-                Connection: "keep-alive",
+                Connection: connectionHeader,
             },
-            options.body
+            options.body,
+            retries,
+            delayMs,
+            timeoutMs
         );
         return { ...postResponse, ip: ip };
     } catch (error: Error | any) {
@@ -500,21 +639,32 @@ export const shellyDeleteCompanionWebhooks = async (ip: string, targetName: stri
 // Detach a relay device's input so a physical flip stops driving its own relay
 // (it becomes a pure companion switch). Best-effort: input-only devices (i4)
 // have no Switch component and this simply no-ops.
-export const shellyDetachInput = async (ip: string, switchId: number = 0): Promise<void> => {
+export const shellyDetachInput = async (
+    ip: string,
+    switchId: number = 0,
+    requestOptions?: ShellyRpcRequestOptions
+): Promise<boolean> => {
     const headers = {
         "Content-Type": "application/json",
         Accept: "application/json",
         "User-Agent": "ShellyApp/1.0",
+        Connection: requestOptions?.connectionHeader ?? "close",
     };
+    const retries = requestOptions?.retries ?? 5;
+    const delayMs = requestOptions?.delayMs ?? 1200;
+    const timeoutMs = requestOptions?.timeoutMs ?? 10000;
+
     try {
         await postRequest(`http://${ip}/rpc/`, headers, {
             id: 0,
             method: "Switch.SetConfig",
             // initial_state must not be `match_input` when detached (invalid combo).
             params: { id: switchId, config: { in_mode: "detached", initial_state: "restore_last" } },
-        });
+        }, retries, delayMs, timeoutMs);
+        return true;
     } catch (error: Error | any) {
         logger.info(`[server]: Could not detach input on device at ${ip} (may be input-only). Error: ${error.message}`);
+        return false;
     }
 };
 

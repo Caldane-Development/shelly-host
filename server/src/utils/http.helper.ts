@@ -13,7 +13,8 @@ async function makeRequest<T>(
   options: RequestOptionsWithProtocol,
   data: string | null = null,
   retries: number = 3,
-  delay: number = 1000
+  delay: number = 1000,
+  timeoutMs: number = 7000
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const requestLib = options.protocol === 'https:' ? https : http;
@@ -38,10 +39,9 @@ async function makeRequest<T>(
       });
     });
 
-    // Set a 2-second timeout
-    req.setTimeout(2000, () => {
+    req.setTimeout(timeoutMs, () => {
       req.destroy();
-      reject(new Error(`Request timed out after 2 seconds`));
+      reject(new Error(`Request timed out after ${timeoutMs} ms`));
     });
 
     req.on('error', (err) => {
@@ -49,7 +49,7 @@ async function makeRequest<T>(
         //console.log(`Retrying due to error: ${err.message}. Attempts left: ${retries - 1}`);
         setTimeout(async () => {
           try {
-            const response = await makeRequest<T>(options, data, retries - 1, delay);
+            const response = await makeRequest<T>(options, data, retries - 1, delay, timeoutMs);
             resolve(response);  // Ensure the retried request resolves the parent promise
           } catch (retryError) {
             reject(retryError);
@@ -73,14 +73,15 @@ async function getRequest<T>(
   url: string,
   headers: Record<string, string> = {},
   retries: number = 3,
-  delay: number = 1000
+  delay: number = 1000,
+  timeoutMs: number = 7000
 ): Promise<T> {
   const options: RequestOptionsWithProtocol = new URL(url);
   options.method = 'GET';
   options.headers = headers;
 
   try {
-    const response = await makeRequest<T>(options, null, retries, delay);
+    const response = await makeRequest<T>(options, null, retries, delay, timeoutMs);
     logger.debug(`GET response: ${JSON.stringify(response)}`);
     return response;
   } catch (error) {
@@ -94,7 +95,8 @@ async function postRequest<T>(
   headers: Record<string, string | number> = {},
   data: Record<string, unknown> = {},
   retries: number = 3,
-  delay: number = 1000
+  delay: number = 1000,
+  timeoutMs: number = 7000
 ): Promise<T> {
   const options: RequestOptionsWithProtocol = new URL(url);
   options.method = 'POST';
@@ -114,7 +116,7 @@ async function postRequest<T>(
 
   try {
     logger.debug(`POST request to ${url} with body: ${body} `);
-    const response = await makeRequest<T>(options, body, retries, delay);
+    const response = await makeRequest<T>(options, body, retries, delay, timeoutMs);
     logger.debug(`POST response: ${JSON.stringify(response)}`);
     return response;
   } catch (error) {

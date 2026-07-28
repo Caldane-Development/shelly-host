@@ -49,11 +49,13 @@ const ShellyEntity = ({
     mode,
     groups = [],
     onGroupsChanged,
+    onDeviceUpdated,
 }: {
     device: IDevice;
     mode: string;
     groups?: DeviceGroup[];
     onGroupsChanged?: () => void;
+    onDeviceUpdated?: (device: IDevice) => void;
 }) => {
     const [deviceEntity, setDeviceEntity] = useState(device);
     const [deviceName, setDeviceName] = useState(device.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
@@ -110,6 +112,12 @@ const ShellyEntity = ({
         setDeviceName(device.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
     }, [device]);
 
+    const applyDeviceUpdate = (updated: IDevice) => {
+        setDeviceEntity(updated);
+        setDeviceName(updated.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
+        onDeviceUpdated?.(updated);
+    };
+
 
     const activateMqtt = async (device: IDevice) => {
         const response = await fetch(`${BACKEND_URL}/shelly/${device.ip}/mqtt`, {
@@ -121,8 +129,7 @@ const ShellyEntity = ({
         });
         if (response.ok) {
             const data = await response.json();
-            setDeviceEntity(data);
-            setDeviceName(data.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
+            applyDeviceUpdate(data);
             console.log("MQTT activated successfully");
         } else {
             console.error("Failed to activate MQTT");
@@ -139,8 +146,7 @@ const ShellyEntity = ({
         });
         if (response.ok) {
             const data = await response.json();
-            setDeviceEntity(data);
-            setDeviceName(data.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
+            applyDeviceUpdate(data);
             console.log("Webhook activated successfully");
         } else {
             console.error("Failed to activate Webhook");
@@ -238,8 +244,7 @@ const ShellyEntity = ({
                 throw new Error(`Request failed: ${response.status}`);
             }
             const data = await response.json();
-            setDeviceEntity(data);
-            setDeviceName(data.name.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase());
+            applyDeviceUpdate(data);
             closeDialog();
         } catch (err) {
             console.error("Failed to enable MQTT", err);
@@ -465,7 +470,12 @@ const ShellyEntity = ({
     const controlledGroups = groups.filter((g) => g.controllerDeviceId === deviceId);
 
     return (
-        <section className={style["shelly-entity"]} data-mqtt={deviceEntity.mqtt?.enable ? "" : undefined} data-ip={deviceEntity.ip}>
+        <section
+            className={style["shelly-entity"]}
+            data-mqtt={deviceEntity.mqtt?.enable ? "" : undefined}
+            data-verify-warning={deviceEntity.verificationWarning ? "" : undefined}
+            data-ip={deviceEntity.ip}
+        >
             <h3 onClick={() => window.open(`http://${deviceEntity.ip}`, "_blank")}>{deviceEntity.name}</h3>
             <p>
                 <b>IP Address:</b> {deviceEntity.ip}
@@ -485,6 +495,11 @@ const ShellyEntity = ({
             <p>
                 <b>MQTT Server:</b> {deviceEntity.mqtt?.server || "N/A"}
             </p>
+            {deviceEntity.verificationWarning && (
+                <p className={style.warning} title={deviceEntity.verificationWarning}>
+                    <b>MQTT Verify:</b> Pending device recheck
+                </p>
+            )}
             <p className={style.topic}>
                 <b>MQTT Topic:</b>{" "}
                 {deviceEntity.mqtt?.topic_prefix ? (

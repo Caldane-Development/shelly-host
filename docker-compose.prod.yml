@@ -18,10 +18,18 @@ services:
   server:
     image: localhost:5000/shelly-host-server:${IMAGE_TAG:-latest}
     pull_policy: always
+    environment:
+      ENABLE_CORS: "false"
+    # In production, keep API internal-only and reachable via nginx front door.
+    # This removes direct host exposure of port 4500.
+    ports: []
 
   client:
     image: localhost:5000/shelly-host-client:${IMAGE_TAG:-latest}
     pull_policy: always
+    environment:
+      # Browser and API share the same origin behind the front door.
+      VITE_APP_BACKEND: "/api"
     # The runtime (nginx) image doesn't need a TTY; leaving it on can keep an
     # SSH-driven `compose up -d` session open during deploy.
     tty: false

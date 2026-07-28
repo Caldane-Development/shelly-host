@@ -41,6 +41,31 @@ interface ReapplyWebhookResult {
     failures: Array<{ ip: string; name: string; reason: string }>;
 }
 
+interface WebhookAuditFinding {
+    ip: string;
+    name: string;
+    hookId: number;
+    event: string;
+    url: string;
+    reason: "rpc_url" | "wrong_host";
+    currentHost: string;
+    expectedHost: string;
+}
+
+interface WebhookAuditResult {
+    webhookHost: string;
+    expectedHost: string;
+    total: number;
+    checked: number;
+    affectedDevices: number;
+    findings: number;
+    rpcUrlFindings: number;
+    wrongHostFindings: number;
+    failed: number;
+    failures: Array<{ ip: string; name: string; reason: string }>;
+    results: WebhookAuditFinding[];
+}
+
 const SiteConfigs = () => {
     const dispatch = useDispatch();
     const networks = useSelector((state: RootState) => state.scanner.networks);
@@ -67,6 +92,10 @@ const SiteConfigs = () => {
     const [reapplyingWebhookHost, setReapplyingWebhookHost] = useState(false);
     const [reapplyWebhookMessage, setReapplyWebhookMessage] = useState("");
     const [reapplyWebhookError, setReapplyWebhookError] = useState("");
+    const [auditingWebhookActions, setAuditingWebhookActions] = useState(false);
+    const [webhookAuditMessage, setWebhookAuditMessage] = useState("");
+    const [webhookAuditError, setWebhookAuditError] = useState("");
+    const [webhookAuditFindings, setWebhookAuditFindings] = useState<WebhookAuditFinding[]>([]);
 
     // MQTT broker state
     const [brokers, setBrokers] = useState<MqttBroker[]>([]);
@@ -440,6 +469,47 @@ const SiteConfigs = () => {
         }
     };
 
+    const handleAuditWebhookActions = async () => {
+        if (siteWebhook.trim() === "") {
+            setWebhookAuditError("Set and save a webhook host first.");
+            setWebhookAuditMessage("");
+            setWebhookAuditFindings([]);
+            return;
+        }
+
+        setAuditingWebhookActions(true);
+        setWebhookAuditError("");
+        setWebhookAuditMessage("");
+        setWebhookAuditFindings([]);
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/shelly/devices/webhooks/audit`);
+            const data = (await response.json()) as WebhookAuditResult | { error?: string };
+
+            if (!response.ok) {
+                throw new Error((data as { error?: string }).error || `Request failed: ${response.status}`);
+            }
+
+            const result = data as WebhookAuditResult;
+            setWebhookAuditFindings(result.results);
+
+            setWebhookAuditMessage(
+                `Audited ${result.checked}/${result.total} devices for host ${result.expectedHost}. ` +
+                `Found ${result.findings} issue(s) across ${result.affectedDevices} device(s): ` +
+                `${result.rpcUrlFindings} RPC URL issue(s), ${result.wrongHostFindings} wrong-host issue(s).`
+            );
+
+            if (result.failed > 0) {
+                setWebhookAuditError(`${result.failed} device(s) could not be audited.`);
+            }
+        } catch (err) {
+            console.error("Failed to audit webhook actions", err);
+            setWebhookAuditError(err instanceof Error ? err.message : "Could not audit webhook actions.");
+        } finally {
+            setAuditingWebhookActions(false);
+        }
+    };
+
     const savedServers = new Set(brokers.map((broker) => broker.server));
 
     return (
@@ -524,6 +594,13 @@ const SiteConfigs = () => {
                         >
                             {reapplyingWebhookHost ? "Updating Webhooks…" : "Update Incorrect Webhook Hosts"}
                         </button>
+                        <button
+                            type="button"
+                            onClick={handleAuditWebhookActions}
+                            disabled={auditingWebhookActions}
+                        >
+                            {auditingWebhookActions ? "Auditing Webhooks…" : "Audit RPC/Wrong-Host Actions"}
+                        </button>
                     </form>
                 )}
                 {siteSaved && <p className={style["network-name"]}>Saved.</p>}
@@ -532,6 +609,22 @@ const SiteConfigs = () => {
                 {reapplyError && <p className={style.error}>{reapplyError}</p>}
                 {reapplyWebhookMessage && <p className={style["broker-meta"]}>{reapplyWebhookMessage}</p>}
                 {reapplyWebhookError && <p className={style.error}>{reapplyWebhookError}</p>}
+                {webhookAuditMessage && <p className={style["broker-meta"]}>{webhookAuditMessage}</p>}
+                {webhookAuditError && <p className={style.error}>{webhookAuditError}</p>}
+                {webhookAuditFindings.length > 0 && (
+                    <ul className={style["audit-list"]}>
+                        {webhookAuditFindings.map((finding, index) => (
+                            <li key={`${finding.ip}-${finding.hookId}-${index}`}>
+                                <div className={style["audit-heading"]}>
+                                    <span className={style["network-name"]}>{finding.name}</span>
+                                    <span className={style["broker-meta"]}>{finding.ip || "no-ip"} · hook {finding.hookId} · {finding.event || "event"}</span>
+                                </div>
+                                <span className={style["broker-meta"]}>{finding.reason === "rpc_url" ? "RPC URL action" : "Wrong webhook host"}</span>
+                                <span className={style["audit-url"]}>{finding.url}</span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </div>
 
             <div className={style.panel}>

@@ -1,5 +1,5 @@
 # Development override for hot reload.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d client
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build proxy client server
 services:
   # Publish the internal services to the host for local development only.
   # Production keeps these internal-only (see docker-compose.yml).
@@ -18,6 +18,12 @@ services:
     ports:
       - "3000:3000"
 
+  # Keep dev aligned with production: API is internal and accessed only through
+  # the front-door proxy on port 4501.
+  server:
+    environment:
+      ENABLE_CORS: "false"
+
   client:
     build:
       context: .
@@ -25,14 +31,27 @@ services:
       target: dev
     image: shelly-host-client:dev
     environment:
-      VITE_APP_BACKEND: "$VITE_APP_BACKEND"
+      # Same-origin API calls through the front-door proxy (/api -> server).
+      VITE_APP_BACKEND: "/api"
       VITE_APP_NAME: "$VITE_APP_NAME"
     volumes:
       - ./client:/app/client
       - ./common:/app/common
       - /app/client/node_modules
     command: ["npm", "run", "dev"]
-    # Dev accesses the client directly on the host; production fronts it with
-    # the nginx proxy instead (see docker-compose.prod.yml).
+
+  # Dev front door (same pattern as production): browser only talks to 4501.
+  proxy:
+    build:
+      context: .
+      dockerfile: proxy/Dockerfile
+    image: shelly-host-proxy:dev
+    container_name: shelly-proxy
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+      client:
+        condition: service_started
     ports:
-      - "4501:4501"
+      - "4501:80"

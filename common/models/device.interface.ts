@@ -13,6 +13,7 @@ export interface IDevice {
     switchStatus: ShellySwitch;
     device: Device;
     src?: string;
+    verificationWarning?: string;
 }
 
 export interface DeviceList {

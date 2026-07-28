@@ -81,6 +81,15 @@ section.shelly-entity {
             }
         }
     }
+
+    &[data-verify-warning] {
+        border-color: #f59e0b;
+        background-color: #fff9ed;
+    }
+}
+
+.warning {
+    color: #92400e;
 }
 
 button.enable-mqtt {

@@ -71,8 +71,8 @@ services:
       loki:
         condition: service_healthy
     restart: unless-stopped
-    ports:
-      - "4500:4500"
+    # Host port publishing lives in docker-compose.dev.yml and production is
+    # fronted by nginx (docker-compose.prod.yml).
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4500/health"]
       interval: 10s

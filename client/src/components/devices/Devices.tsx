@@ -59,6 +59,26 @@ const Devices = () => {
         }
     }, []);
 
+    const handleDeviceUpdated = useCallback((updated: IDevice) => {
+        setDevices((prev) =>
+            prev.map((device) => {
+                const sameId = updated.device?.id !== undefined && device.device?.id === updated.device?.id;
+                const sameIp = updated.ip && device.ip === updated.ip;
+                if (!sameId && !sameIp) {
+                    return device;
+                }
+
+                // Preserve the latest known live relay output from the list,
+                // but update config fields (MQTT, room, webhooks, etc.).
+                return {
+                    ...device,
+                    ...updated,
+                    switchStatus: device.switchStatus,
+                };
+            })
+        );
+    }, []);
+
     // Fetch live switch status (queried server-side over HTTP) and merge it into
     // the cards by device id. Safe to call repeatedly.
     const fetchStatuses = useCallback(async () => {
@@ -179,6 +199,7 @@ const Devices = () => {
                                 mode="normal"
                                 groups={groups}
                                 onGroupsChanged={fetchGroups}
+                                onDeviceUpdated={handleDeviceUpdated}
                             />
                         ))}
                 </div>
