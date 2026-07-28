@@ -82,6 +82,15 @@ section.shelly-entity {
         }
     }
 
+    &[data-linked] {
+        border: #04619127 solid 3px;
+        background-color: #d8ecf1ce;
+
+        h3 {
+            color: #046191;
+        }
+    }
+
     &[data-verify-warning] {
         border-color: #f59e0b;
         background-color: #fff9ed;

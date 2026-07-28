@@ -486,6 +486,7 @@ const ShellyEntity = ({
         <section
             className={style["shelly-entity"]}
             data-mqtt={deviceEntity.mqtt?.enable ? "" : undefined}
+            data-linked={linked ? "" : undefined}
             data-verify-warning={deviceEntity.verificationWarning ? "" : undefined}
             data-ip={deviceEntity.ip}
         >
