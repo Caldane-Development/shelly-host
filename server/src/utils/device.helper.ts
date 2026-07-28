@@ -11,6 +11,41 @@ const slugify = (text: string): string => text.replace(/[^a-zA-Z0-9]/g, "-").toL
 const messageUrlPattern = /\/api\/message\/srd\/[^/]+\/(\d+)\/([^/]+)\/switch\/message\/toggle\/[^/?#]+/i;
 const groupUrlPattern = /\/api\/group\/\d+\/trigger/i;
 
+const extractLinkedTargets = (
+    device: IDevice,
+    sourceSlug: string,
+    groupNameById: Map<number, string>,
+    controllerGroupNames: string[]
+): string[] => {
+    const details = new Set<string>();
+    controllerGroupNames.forEach((name) => details.add(`Group: ${name}`));
+
+    const hooks = device.webhooks?.result?.hooks ?? [];
+    for (const hook of hooks) {
+        for (const url of hook.urls ?? []) {
+            const groupMatch = url.match(/\/api\/group\/(\d+)\/trigger/i);
+            if (groupMatch) {
+                const groupId = Number(groupMatch[1]);
+                const groupName = groupNameById.get(groupId);
+                details.add(groupName ? `Group: ${groupName}` : `Group ID: ${groupId}`);
+                continue;
+            }
+
+            const messageMatch = messageUrlPattern.exec(url);
+            if (!messageMatch) {
+                continue;
+            }
+
+            const targetSlug = slugify(messageMatch[2] || "");
+            if (targetSlug && targetSlug !== sourceSlug) {
+                details.add(`Device: ${targetSlug}`);
+            }
+        }
+    }
+
+    return [...details].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+};
+
 const hasLinkedActions = (device: IDevice): boolean => {
     const hooks = device.webhooks?.result?.hooks ?? [];
     if (!hooks.length) {
@@ -65,7 +100,7 @@ export const createIDevice = (device: Device): IDevice => {
     } as IDevice;
 };
 
-const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"]) => ({
+const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"], linkedTargets: string[] = []) => ({
     id: device.id.toString(),
     type: device.type,
     category: device.category,
@@ -86,24 +121,45 @@ const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"]) => ({
     mqttServer: mqtt?.server || "",
     mqttTopic: mqtt?.topic_prefix || "",
     linked: false,
+    linkedTargets: linkedTargets.join("; "),
 });
 
 export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void> => {
     const groups = await db
-        .select({ controllerDeviceId: switchGroups.controllerDeviceId })
+        .select({ id: switchGroups.id, name: switchGroups.name, controllerDeviceId: switchGroups.controllerDeviceId })
         .from(switchGroups);
     const controllerIds = new Set(
         groups
             .map((group) => group.controllerDeviceId)
             .filter((id): id is string => Boolean(id && id.trim() !== ""))
     );
+    const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
+    const groupNamesByControllerId = new Map<string, string[]>();
+
+    groups.forEach((group) => {
+        if (!group.controllerDeviceId) {
+            return;
+        }
+        const key = group.controllerDeviceId;
+        const names = groupNamesByControllerId.get(key) ?? [];
+        names.push(group.name);
+        groupNamesByControllerId.set(key, names);
+    });
 
     const rows = discovered
         .filter((d) => d?.device && d.device.id !== undefined && d.device.id !== null)
-        .map((d) => ({
-            ...toDeviceRow(d.device, d.mqtt),
-            linked: hasLinkedActions(d) || controllerIds.has(String(d.device.id)),
-        }));
+        .map((d) => {
+            const deviceId = String(d.device.id);
+            const sourceSlug = slugify(d.name || d.device.name || "");
+            const controllerGroupNames = (groupNamesByControllerId.get(deviceId) ?? []).sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: "base" })
+            );
+            const linkedTargets = extractLinkedTargets(d, sourceSlug, groupNameById, controllerGroupNames);
+            return {
+                ...toDeviceRow(d.device, d.mqtt, linkedTargets),
+                linked: linkedTargets.length > 0 || hasLinkedActions(d) || controllerIds.has(deviceId),
+            };
+        });
 
     if (rows.length === 0) {
         return;
@@ -135,6 +191,7 @@ export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void
                     mqttServer: sql`excluded.mqtt_server`,
                     mqttTopic: sql`excluded.mqtt_topic`,
                     linked: sql`excluded.linked`,
+                    linkedTargets: sql`excluded.linked_targets`,
                 },
             });
         logger.info(`[server]: Saved ${rows.length} discovered device(s) to the database`);
@@ -184,6 +241,9 @@ export const getStoredIDevices = async (): Promise<IDevice[]> => {
         return {
             ...device,
             linked: Boolean(row.linked),
+            linkedTargets: row.linkedTargets
+                ? row.linkedTargets.split(";").map((entry) => entry.trim()).filter((entry) => entry !== "")
+                : [],
             mqtt: {
                 ...device.mqtt,
                 enable,

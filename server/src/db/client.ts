@@ -33,6 +33,7 @@ export const ensureSchema = async (): Promise<void> => {
             mqtt_server text DEFAULT '',
             mqtt_topic text DEFAULT '',
             linked boolean NOT NULL DEFAULT false,
+            linked_targets text DEFAULT '',
             bundle boolean DEFAULT false
         );
     `;
@@ -41,6 +42,7 @@ export const ensureSchema = async (): Promise<void> => {
     await queryClient`ALTER TABLE devices ADD COLUMN IF NOT EXISTS mqtt_server text DEFAULT '';`;
     await queryClient`ALTER TABLE devices ADD COLUMN IF NOT EXISTS mqtt_topic text DEFAULT '';`;
     await queryClient`ALTER TABLE devices ADD COLUMN IF NOT EXISTS linked boolean NOT NULL DEFAULT false;`;
+    await queryClient`ALTER TABLE devices ADD COLUMN IF NOT EXISTS linked_targets text DEFAULT '';`;
     await queryClient`
         CREATE TABLE IF NOT EXISTS rooms (
             id integer PRIMARY KEY,

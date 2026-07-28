@@ -484,6 +484,13 @@ const ShellyEntity = ({
     const linked = hasLinkedActions(deviceEntity) || Boolean(deviceEntity.linked);
     const linkedTargets = (() => {
         const details = new Set<string>();
+
+        (deviceEntity.linkedTargets ?? []).forEach((target) => {
+            if (target.trim() !== "") {
+                details.add(target.trim());
+            }
+        });
+
         const sourceSlug = slugify(deviceEntity.name || "");
 
         for (const group of controlledGroups) {
@@ -498,21 +505,28 @@ const ShellyEntity = ({
                     const id = Number(groupMatch[1]);
                     const groupName = groups.find((g) => g.id === id)?.name;
                     details.add(groupName ? `Group: ${groupName}` : `Group ID: ${id}`);
+                    continue;
                 }
 
                 const messageMatch = linkMessagePattern.exec(url);
-                if (messageMatch) {
-                    const targetSlug = slugify(messageMatch[2] || "");
-                    if (targetSlug && targetSlug !== sourceSlug) {
-                        details.add(`Device: ${targetSlug}`);
-                    }
+                if (!messageMatch) {
+                    continue;
+                }
+
+                const targetSlug = slugify(messageMatch[2] || "");
+                if (targetSlug && targetSlug !== sourceSlug) {
+                    details.add(`Device: ${targetSlug}`);
                 }
             }
         }
 
         return [...details].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
     })();
-    const linkedTitle = linkedTargets.length > 0 ? linkedTargets.join("; ") : linked ? "Linked target details unavailable" : "Not linked";
+    const linkedTitle = linkedTargets.length > 0
+        ? linkedTargets.join("; ")
+        : linked
+            ? "Linked target details not loaded in this view"
+            : "Not linked";
 
     return (
         <section
