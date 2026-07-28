@@ -1,4 +1,4 @@
-import { faCloudArrowUp, faCopy, faLink, faMessage, faObjectGroup, faPen, faPowerOff, faTowerBroadcast, faWifi, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCloudArrowUp, faCopy, faLink, faMessage, faObjectGroup, faPen, faPowerOff, faTowerBroadcast, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { IDevice } from "../../../../common/models/device.interface";
@@ -119,7 +119,6 @@ const ShellyEntity = ({
     const [submitting, setSubmitting] = useState(false);
 
     // Change-WiFi dialog state
-    const [showWifiDialog, setShowWifiDialog] = useState(false);
     const [wifiCredentials, setWifiCredentials] = useState<WifiCredential[]>([]);
     const [selSsid, setSelSsid] = useState("");
     const [wifiDialogError, setWifiDialogError] = useState("");
@@ -307,33 +306,21 @@ const ShellyEntity = ({
         }
     };
 
-    const openWifiDialog = async () => {
-        setWifiDialogError("");
-        setShowWifiDialog(true);
-        try {
-            const response = await fetch(`${BACKEND_URL}/wifi`);
-            const creds: WifiCredential[] = response.ok ? await response.json() : [];
-            setWifiCredentials(creds);
-            setSelSsid(creds[0]?.ssid || "");
-        } catch (err) {
-            console.error("Failed to load WiFi credentials", err);
-            setWifiDialogError("Could not load WiFi credentials from the server.");
-        }
-    };
-
-    const closeWifiDialog = () => {
-        setShowWifiDialog(false);
-        setWifiDialogError("");
-    };
-
     const openRoomDialog = async () => {
         setRoomDialogError("");
+        setWifiDialogError("");
         setShowRoomDialog(true);
         try {
-            const response = await fetch(`${BACKEND_URL}/shelly/rooms`);
-            const rooms: StoredRoom[] = response.ok ? await response.json() : [];
+            const [roomsResponse, wifiResponse] = await Promise.all([
+                fetch(`${BACKEND_URL}/shelly/rooms`),
+                fetch(`${BACKEND_URL}/wifi`),
+            ]);
+            const rooms: StoredRoom[] = roomsResponse.ok ? await roomsResponse.json() : [];
+            const creds: WifiCredential[] = wifiResponse.ok ? await wifiResponse.json() : [];
             const sorted = [...rooms].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
             setRoomOptions(sorted);
+            setWifiCredentials(creds);
+            setSelSsid(creds[0]?.ssid || "");
 
             const currentRoomId = Number(deviceEntity.room?.id);
             const defaultRoomId = Number.isInteger(currentRoomId) && currentRoomId > 0
@@ -341,14 +328,15 @@ const ShellyEntity = ({
                 : (sorted[0]?.id ?? 0);
             setSelRoomId(defaultRoomId > 0 ? String(defaultRoomId) : "");
         } catch (err) {
-            console.error("Failed to load rooms", err);
-            setRoomDialogError("Could not load rooms from the server.");
+            console.error("Failed to load edit options", err);
+            setRoomDialogError("Could not load edit options from the server.");
         }
     };
 
     const closeRoomDialog = () => {
         setShowRoomDialog(false);
         setRoomDialogError("");
+        setWifiDialogError("");
     };
 
     const submitRoomChange = async () => {
@@ -409,7 +397,7 @@ const ShellyEntity = ({
             if (!response.ok) {
                 throw new Error(`Request failed: ${response.status}`);
             }
-            closeWifiDialog();
+            closeRoomDialog();
             alert(
                 `WiFi change sent to ${deviceEntity.name}.\n\nThe device will reboot and reconnect to "${selSsid}". ` +
                     `It will get a new IP on that network, so re-run the scanner to find it again.`
@@ -698,11 +686,6 @@ const ShellyEntity = ({
                     </button>
                 )}
                 {mode === "normal" && (
-                    <button className={style["change-wifi"]} onClick={openWifiDialog} title="Change WiFi network">
-                        <FontAwesomeIcon icon={faWifi} />
-                    </button>
-                )}
-                {mode === "normal" && (
                     <button
                         className={style["change-wifi"]}
                         onClick={openCompanionDialog}
@@ -882,66 +865,6 @@ const ShellyEntity = ({
                     </div>
                 </div>
             )}
-            {showWifiDialog && (
-                <div className={style["dialog-overlay"]} onClick={closeWifiDialog}>
-                    <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
-                        <div className={style["dialog-header"]}>
-                            <h4>Change WiFi — {deviceEntity.name}</h4>
-                            <button className={style["dialog-close"]} onClick={closeWifiDialog} aria-label="Close">
-                                <FontAwesomeIcon icon={faXmark} />
-                            </button>
-                        </div>
-
-                        <p className={style["dialog-note"]}>
-                            Current network: <b>{deviceEntity.device?.ssid || "unknown"}</b>. The device will reboot,
-                            reconnect on the new network with a new IP, and drop off this list until you re-scan.
-                        </p>
-
-                        <label className={style["dialog-field"]}>
-                            <span>WiFi Network</span>
-                            <select
-                                value={selSsid}
-                                onChange={(e) => {
-                                    setSelSsid(e.target.value);
-                                    if (wifiDialogError) setWifiDialogError("");
-                                }}
-                            >
-                                {wifiCredentials.length === 0 ? (
-                                    <option value="">No saved WiFi credentials</option>
-                                ) : (
-                                    wifiCredentials.map((cred) => (
-                                        <option key={cred.id} value={cred.ssid}>
-                                            {cred.ssid}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                        </label>
-
-                        {wifiCredentials.length === 0 && (
-                            <p className={style["dialog-note"]}>
-                                Add WiFi credentials in Site Configs first.
-                            </p>
-                        )}
-
-                        {wifiDialogError && <p className={style.error}>{wifiDialogError}</p>}
-
-                        <div className={style["dialog-actions"]}>
-                            <button type="button" className={style["dialog-cancel"]} onClick={closeWifiDialog} disabled={wifiSubmitting}>
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className={style["dialog-submit"]}
-                                onClick={submitChangeWifi}
-                                disabled={wifiSubmitting || wifiCredentials.length === 0}
-                            >
-                                {wifiSubmitting ? "Sending…" : "Change WiFi"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
             {showCompanionDialog && (
                 <div className={style["dialog-overlay"]} onClick={closeCompanionDialog}>
                     <div className={style.dialog} onClick={(e) => e.stopPropagation()}>
@@ -1113,11 +1036,49 @@ const ShellyEntity = ({
                             </select>
                         </label>
 
+                        <p className={style["dialog-note"]}>
+                            Current network: <b>{deviceEntity.device?.ssid || "unknown"}</b>. Changing WiFi will reboot the device.
+                        </p>
+
+                        <label className={style["dialog-field"]}>
+                            <span>WiFi Network</span>
+                            <select
+                                value={selSsid}
+                                onChange={(e) => {
+                                    setSelSsid(e.target.value);
+                                    if (wifiDialogError) setWifiDialogError("");
+                                }}
+                            >
+                                {wifiCredentials.length === 0 ? (
+                                    <option value="">No saved WiFi credentials</option>
+                                ) : (
+                                    wifiCredentials.map((cred) => (
+                                        <option key={cred.id} value={cred.ssid}>
+                                            {cred.ssid}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </label>
+
+                        {wifiCredentials.length === 0 && (
+                            <p className={style["dialog-note"]}>Add WiFi credentials in Site Configs first.</p>
+                        )}
+
                         {roomDialogError && <p className={style.error}>{roomDialogError}</p>}
+                        {wifiDialogError && <p className={style.error}>{wifiDialogError}</p>}
 
                         <div className={style["dialog-actions"]}>
                             <button type="button" className={style["dialog-cancel"]} onClick={closeRoomDialog} disabled={roomSubmitting}>
                                 Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className={style["dialog-submit"]}
+                                onClick={submitChangeWifi}
+                                disabled={wifiSubmitting || wifiCredentials.length === 0}
+                            >
+                                {wifiSubmitting ? "Sending..." : "Change WiFi"}
                             </button>
                             <button
                                 type="button"
