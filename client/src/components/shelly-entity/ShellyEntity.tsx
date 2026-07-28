@@ -18,7 +18,6 @@ const hasLinkedActions = (device: IDevice): boolean => {
     }
 
     const sourceSlug = slugify(device.name || "");
-    const sourceRoomId = Number(device.room?.id ?? device.device?.room_id ?? -1);
 
     for (const hook of hooks) {
         for (const url of hook.urls ?? []) {
@@ -29,9 +28,11 @@ const hasLinkedActions = (device: IDevice): boolean => {
             if (!match) {
                 continue;
             }
-            const targetRoomId = Number(match[1]);
             const targetSlug = slugify(match[2] || "");
-            if (targetSlug !== sourceSlug || targetRoomId !== sourceRoomId) {
+            // Keep parity with server-side linked inference: webhook URLs with
+            // matching target slug are treated as self-targeted even if legacy
+            // room IDs in the URL are out of date.
+            if (targetSlug !== sourceSlug) {
                 return true;
             }
         }

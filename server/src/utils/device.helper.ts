@@ -18,7 +18,6 @@ const hasLinkedActions = (device: IDevice): boolean => {
     }
 
     const sourceSlug = slugify(device.name || "");
-    const sourceRoomId = Number(device.room?.id ?? device.device?.room_id ?? -1);
 
     for (const hook of hooks) {
         for (const url of hook.urls ?? []) {
@@ -31,9 +30,11 @@ const hasLinkedActions = (device: IDevice): boolean => {
                 continue;
             }
 
-            const targetRoomId = Number(match[1]);
             const targetSlug = slugify(match[2] || "");
-            if (targetSlug !== sourceSlug || targetRoomId !== sourceRoomId) {
+            // Room IDs in legacy webhook URLs can drift while still targeting
+            // the same logical device slug. Only treat as linked when the
+            // target device slug differs from the source device slug.
+            if (targetSlug !== sourceSlug) {
                 return true;
             }
         }
