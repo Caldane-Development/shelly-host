@@ -10,6 +10,7 @@ import ShellyEntity, { DeviceGroup } from "../shelly-entity/ShellyEntity";
 const STATUS_POLL_MS = 10000;
 
 const slugify = (text: string) => text.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
+const linkMessagePattern = /\/api\/message\/srd\/[^/]+\/(\d+)\/([^/]+)\/switch\/message\/toggle\/[^/?#]+/i;
 
 const isPlusI4 = (device: IDevice) =>
     device.device?.category === "inputs_reader" && Math.max(1, Number(device.device?.channels_count) || 1) === 4;
@@ -65,19 +66,47 @@ const Devices = () => {
             outputBySlug.set(slugify(device.name || ""), Boolean(device.switchStatus?.output));
         });
 
+        const collectWebhookDeviceTargets = (device: IDevice, inputIndex?: number): string[] => {
+            const targets = new Set<string>();
+            const hooks = device.webhooks?.result?.hooks ?? [];
+            const sourceSlug = slugify(device.name || "");
+
+            hooks.forEach((hook) => {
+                if (inputIndex !== undefined && Number(hook.cid ?? 0) !== inputIndex) {
+                    return;
+                }
+                (hook.urls ?? []).forEach((url) => {
+                    const match = linkMessagePattern.exec(url);
+                    if (!match) {
+                        return;
+                    }
+                    const targetSlug = slugify(match[2] || "");
+                    if (targetSlug && targetSlug !== sourceSlug) {
+                        targets.add(targetSlug);
+                    }
+                });
+            });
+
+            return [...targets];
+        };
+
         const resolveLinkedPowerStatus = (device: IDevice, inputIndex?: number): boolean | undefined => {
-            const targets = inputIndex !== undefined
+            const persistedTargets = inputIndex !== undefined
                 ? device.linkedInputTargets?.[String(inputIndex)] ?? []
                 : device.linkedTargets ?? [];
-            const deviceTargets = targets
+            const deviceTargets = persistedTargets
                 .filter((entry) => entry.toLowerCase().startsWith("device:"))
                 .map((entry) => slugify(entry.split(":").slice(1).join(":").trim()));
 
-            if (deviceTargets.length !== 1) {
+            const webhookTargets = collectWebhookDeviceTargets(device, inputIndex);
+            const targetCandidates = new Set<string>([...deviceTargets, ...webhookTargets]);
+
+            if (targetCandidates.size !== 1) {
                 return undefined;
             }
 
-            return outputBySlug.get(deviceTargets[0]);
+            const [targetSlug] = [...targetCandidates];
+            return outputBySlug.get(targetSlug);
         };
 
         const sorted = [...list].sort((a, b) =>
