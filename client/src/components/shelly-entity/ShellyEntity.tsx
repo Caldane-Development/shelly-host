@@ -11,7 +11,7 @@ const slugify = (text: string) => text.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLow
 const linkMessagePattern = /\/api\/message\/srd\/[^/]+\/(\d+)\/([^/]+)\/switch\/message\/toggle\/[^/?#]+/i;
 const linkGroupPattern = /\/api\/group\/\d+\/trigger/i;
 
-const hasLinkedActions = (device: IDevice): boolean => {
+const hasLinkedActions = (device: IDevice, inputId?: number): boolean => {
     const hooks = device.webhooks?.result?.hooks ?? [];
     if (!hooks.length) {
         return false;
@@ -20,6 +20,9 @@ const hasLinkedActions = (device: IDevice): boolean => {
     const sourceSlug = slugify(device.name || "");
 
     for (const hook of hooks) {
+        if (inputId !== undefined && Number(hook.cid ?? 0) !== inputId) {
+            continue;
+        }
         for (const url of hook.urls ?? []) {
             if (linkGroupPattern.test(url)) {
                 return true;
@@ -78,12 +81,18 @@ const copy = (text: string, label: string) => {
 
 const ShellyEntity = ({
     device,
+    displayName,
+    inputIndex,
+    lockInputSelection,
     mode,
     groups = [],
     onGroupsChanged,
     onDeviceUpdated,
 }: {
     device: IDevice;
+    displayName?: string;
+    inputIndex?: number;
+    lockInputSelection?: boolean;
     mode: string;
     groups?: DeviceGroup[];
     onGroupsChanged?: () => void;
@@ -130,6 +139,8 @@ const ShellyEntity = ({
         deviceEntity.device?.category === "inputs_reader"
             ? Math.max(1, Number(deviceEntity.device?.channels_count) || 1)
             : 1;
+    const resolvedInputIndex = Number.isInteger(inputIndex) && (inputIndex ?? -1) >= 0 ? Number(inputIndex) : 0;
+    const isInputTile = deviceEntity.device?.category === "inputs_reader";
     // Only relay devices have a local relay worth detaching.
     const hasLocalRelay = deviceEntity.device?.category !== "inputs_reader";
 
@@ -338,7 +349,7 @@ const ShellyEntity = ({
     const openCompanionDialog = async () => {
         setCompanionError("");
         setDetachLocal(hasLocalRelay);
-        setSelCompInput("0");
+        setSelCompInput(String(resolvedInputIndex));
         setShowCompanionDialog(true);
         try {
             const [roomsResponse, devicesResponse] = await Promise.all([
@@ -481,11 +492,19 @@ const ShellyEntity = ({
     const deviceId = deviceEntity.device?.id?.toString() ?? "";
     const memberGroups = groups.filter((g) => g.members?.some((m) => m.deviceId === deviceId));
     const controlledGroups = groups.filter((g) => g.controllerDeviceId === deviceId);
-    const linked = hasLinkedActions(deviceEntity) || Boolean(deviceEntity.linked);
+    const persistedInputTargets = deviceEntity.linkedInputTargets?.[String(resolvedInputIndex)] ?? [];
+    const linkedByHooks = hasLinkedActions(deviceEntity, isInputTile ? resolvedInputIndex : undefined);
+    const linked = isInputTile
+        ? persistedInputTargets.length > 0 || linkedByHooks
+        : hasLinkedActions(deviceEntity) || Boolean(deviceEntity.linked);
+    const switchState = isInputTile
+        ? Boolean(deviceEntity.inputStates?.[resolvedInputIndex])
+        : Boolean(deviceEntity?.switchStatus?.output);
     const linkedTargets = (() => {
         const details = new Set<string>();
 
-        (deviceEntity.linkedTargets ?? []).forEach((target) => {
+        const persistedTargets = isInputTile ? persistedInputTargets : (deviceEntity.linkedTargets ?? []);
+        persistedTargets.forEach((target) => {
             if (target.trim() !== "") {
                 details.add(target.trim());
             }
@@ -493,12 +512,15 @@ const ShellyEntity = ({
 
         const sourceSlug = slugify(deviceEntity.name || "");
 
-        for (const group of controlledGroups) {
+        for (const group of isInputTile ? [] : controlledGroups) {
             details.add(`Group: ${group.name}`);
         }
 
         const hooks = deviceEntity.webhooks?.result?.hooks ?? [];
         for (const hook of hooks) {
+            if (isInputTile && Number(hook.cid ?? 0) !== resolvedInputIndex) {
+                continue;
+            }
             for (const url of hook.urls ?? []) {
                 const groupMatch = url.match(/\/api\/group\/(\d+)\/trigger/i);
                 if (groupMatch) {
@@ -536,7 +558,7 @@ const ShellyEntity = ({
             data-verify-warning={deviceEntity.verificationWarning ? "" : undefined}
             data-ip={deviceEntity.ip}
         >
-            <h3 onClick={() => window.open(`http://${deviceEntity.ip}`, "_blank")}>{deviceEntity.name}</h3>
+            <h3 onClick={() => window.open(`http://${deviceEntity.ip}`, "_blank")}>{displayName ?? deviceEntity.name}</h3>
             <p>
                 <b>IP Address:</b> {deviceEntity.ip}
             </p>
@@ -547,7 +569,7 @@ const ShellyEntity = ({
                 <b>Room:</b> {deviceEntity.room?.name || "No room assigned"}
             </p>
             <p>
-                <b>State:</b> {deviceEntity?.switchStatus?.output ? "On" : "Off"}
+                <b>State:</b> {switchState ? "On" : "Off"}
             </p>
             <p>
                 <b>WiFi:</b> {deviceEntity.device?.ssid || "N/A"}
@@ -949,7 +971,7 @@ const ShellyEntity = ({
                             </label>
                         )}
 
-                        {inputCount > 1 && (
+                        {inputCount > 1 && !lockInputSelection && (
                             <label className={style["dialog-field"]}>
                                 <span>Link Input</span>
                                 <select
@@ -963,6 +985,9 @@ const ShellyEntity = ({
                                     ))}
                                 </select>
                             </label>
+                        )}
+                        {inputCount > 1 && lockInputSelection && (
+                            <p className={style["dialog-note"]}>Link Input: {resolvedInputIndex}</p>
                         )}
 
                         {hasLocalRelay && selCompRoom !== GROUPS_ROOM_VALUE && (

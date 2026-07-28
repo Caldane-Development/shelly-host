@@ -43,6 +43,7 @@ export const devices = pgTable('devices', {
   mqttTopic: text('mqtt_topic').default(''),
   linked: boolean('linked').notNull().default(false),
   linkedTargets: text('linked_targets').default(''),
+  linkedInputTargets: text('linked_input_targets').default(''),
   bundle: boolean('bundle').default(false),  // optional field, default false
 });
 

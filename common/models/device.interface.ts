@@ -8,8 +8,10 @@ export interface IDevice {
     type: string;
     channel: string;
     mqtt: MqttResponseResult;
-  linked?: boolean;
+    linked?: boolean;
     linkedTargets?: string[];
+    linkedInputTargets?: Record<string, string[]>;
+    inputStates?: boolean[];
     room?: { name: string, id: number };
     webhooks?: Webhooks;
     switchStatus: ShellySwitch;

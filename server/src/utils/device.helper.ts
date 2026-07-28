@@ -46,6 +46,47 @@ const extractLinkedTargets = (
     return [...details].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 };
 
+const extractLinkedTargetsByInput = (device: IDevice, sourceSlug: string, groupNameById: Map<number, string>) => {
+    const byInput = new Map<number, Set<string>>();
+    const hooks = device.webhooks?.result?.hooks ?? [];
+
+    for (const hook of hooks) {
+        const inputId = Number.isInteger(hook.cid) && Number(hook.cid) >= 0 ? Number(hook.cid) : 0;
+        const details = byInput.get(inputId) ?? new Set<string>();
+
+        for (const url of hook.urls ?? []) {
+            const groupMatch = url.match(/\/api\/group\/(\d+)\/trigger/i);
+            if (groupMatch) {
+                const groupId = Number(groupMatch[1]);
+                const groupName = groupNameById.get(groupId);
+                details.add(groupName ? `Group: ${groupName}` : `Group ID: ${groupId}`);
+                continue;
+            }
+
+            const messageMatch = messageUrlPattern.exec(url);
+            if (!messageMatch) {
+                continue;
+            }
+
+            const targetSlug = slugify(messageMatch[2] || "");
+            if (targetSlug && targetSlug !== sourceSlug) {
+                details.add(`Device: ${targetSlug}`);
+            }
+        }
+
+        if (details.size > 0) {
+            byInput.set(inputId, details);
+        }
+    }
+
+    const linkedInputTargets: Record<string, string[]> = {};
+    byInput.forEach((values, inputId) => {
+        linkedInputTargets[String(inputId)] = [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    });
+
+    return linkedInputTargets;
+};
+
 const hasLinkedActions = (device: IDevice): boolean => {
     const hooks = device.webhooks?.result?.hooks ?? [];
     if (!hooks.length) {
@@ -100,7 +141,7 @@ export const createIDevice = (device: Device): IDevice => {
     } as IDevice;
 };
 
-const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"], linkedTargets: string[] = []) => ({
+const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"], linkedTargets: string[] = [], linkedInputTargets: Record<string, string[]> = {}) => ({
     id: device.id.toString(),
     type: device.type,
     category: device.category,
@@ -122,6 +163,7 @@ const toDeviceRow = (device: Device, mqtt?: IDevice["mqtt"], linkedTargets: stri
     mqttTopic: mqtt?.topic_prefix || "",
     linked: false,
     linkedTargets: linkedTargets.join("; "),
+    linkedInputTargets: JSON.stringify(linkedInputTargets),
 });
 
 export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void> => {
@@ -155,8 +197,9 @@ export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void
                 a.localeCompare(b, undefined, { sensitivity: "base" })
             );
             const linkedTargets = extractLinkedTargets(d, sourceSlug, groupNameById, controllerGroupNames);
+            const linkedInputTargets = extractLinkedTargetsByInput(d, sourceSlug, groupNameById);
             return {
-                ...toDeviceRow(d.device, d.mqtt, linkedTargets),
+                ...toDeviceRow(d.device, d.mqtt, linkedTargets, linkedInputTargets),
                 linked: linkedTargets.length > 0 || hasLinkedActions(d) || controllerIds.has(deviceId),
             };
         });
@@ -192,6 +235,7 @@ export const saveDiscoveredDevices = async (discovered: IDevice[]): Promise<void
                     mqttTopic: sql`excluded.mqtt_topic`,
                     linked: sql`excluded.linked`,
                     linkedTargets: sql`excluded.linked_targets`,
+                    linkedInputTargets: sql`excluded.linked_input_targets`,
                 },
             });
         logger.info(`[server]: Saved ${rows.length} discovered device(s) to the database`);
@@ -244,6 +288,17 @@ export const getStoredIDevices = async (): Promise<IDevice[]> => {
             linkedTargets: row.linkedTargets
                 ? row.linkedTargets.split(";").map((entry) => entry.trim()).filter((entry) => entry !== "")
                 : [],
+            linkedInputTargets: (() => {
+                if (!row.linkedInputTargets) {
+                    return {};
+                }
+                try {
+                    const parsed = JSON.parse(row.linkedInputTargets) as Record<string, string[]>;
+                    return parsed && typeof parsed === "object" ? parsed : {};
+                } catch {
+                    return {};
+                }
+            })(),
             mqtt: {
                 ...device.mqtt,
                 enable,

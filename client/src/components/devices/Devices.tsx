@@ -11,6 +11,16 @@ const STATUS_POLL_MS = 10000;
 
 const slugify = (text: string) => text.replace(/[^a-zA-Z0-9]/g, "-").toLocaleLowerCase();
 
+const isPlusI4 = (device: IDevice) =>
+    device.device?.category === "inputs_reader" && Math.max(1, Number(device.device?.channels_count) || 1) === 4;
+
+interface DeviceTile {
+    device: IDevice;
+    displayName: string;
+    inputIndex?: number;
+    lockInputSelection?: boolean;
+}
+
 // Devices that share an MQTT topic represent a single logical switch (e.g. a
 // 3-way pairing). The "owner" is the device whose name matches the device slug
 // embedded in the topic (`{site}/{room}/{device-slug}/switch`); its state is
@@ -47,6 +57,33 @@ const Devices = () => {
     const [groups, setGroups] = useState<DeviceGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    const buildTiles = useCallback((list: IDevice[]): DeviceTile[] => {
+        const sorted = [...list].sort((a, b) =>
+            (a?.room?.name || "Unknown").localeCompare(b?.room?.name || "Unknown", undefined, { sensitivity: "base" }) !== 0
+                ? (a?.room?.name || "Unknown").localeCompare(b?.room?.name || "Unknown", undefined, { sensitivity: "base" })
+                : a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+        );
+
+        const tiles: DeviceTile[] = [];
+        sorted.forEach((device) => {
+            if (!isPlusI4(device)) {
+                tiles.push({ device, displayName: device.name });
+                return;
+            }
+
+            for (let inputIndex = 0; inputIndex < 4; inputIndex++) {
+                tiles.push({
+                    device,
+                    displayName: `${device.name} (${inputIndex})`,
+                    inputIndex,
+                    lockInputSelection: true,
+                });
+            }
+        });
+
+        return tiles;
+    }, []);
 
     // Load switch groups so each card can show its memberships / controlled
     // groups. Refreshed when a card assigns a controller.
@@ -87,14 +124,19 @@ const Devices = () => {
             if (!response.ok) {
                 return;
             }
-            const statuses: { id: string; ip: string; output: boolean }[] = await response.json();
-            const byId = new Map(statuses.map((status) => [status.id, status.output]));
+            const statuses: { id: string; ip: string; output: boolean; inputStates?: boolean[] }[] = await response.json();
+            const byId = new Map(statuses.map((status) => [status.id, status]));
             setDevices((prev) =>
                 mirrorSharedTopics(
                     prev.map((device) => {
                         const id = device.device?.id?.toString();
-                        if (id !== undefined && byId.has(id)) {
-                            return { ...device, switchStatus: { ...device.switchStatus, output: byId.get(id)! } };
+                        const status = id !== undefined ? byId.get(id) : undefined;
+                        if (status) {
+                            return {
+                                ...device,
+                                inputStates: status.inputStates ?? device.inputStates,
+                                switchStatus: { ...device.switchStatus, output: status.output },
+                            };
                         }
                         return device;
                     })
@@ -186,16 +228,13 @@ const Devices = () => {
                 </div>
             ) : (
                 <div className={style["device-grid"]}>
-                    {devices
-                        .sort((a, b) =>
-                            (a?.room?.name || "Unknown").localeCompare(b?.room?.name || "Unknown", undefined, { sensitivity: "base" }) !== 0
-                                ? (a?.room?.name || "Unknown").localeCompare(b?.room?.name || "Unknown", undefined, { sensitivity: "base" })
-                                : a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-                        )
-                        .map((device) => (
+                    {buildTiles(devices).map((tile) => (
                             <ShellyEntity
-                                key={device.device?.id ?? device.ip}
-                                device={device}
+                                key={`${tile.device.device?.id ?? tile.device.ip}-${tile.inputIndex ?? 0}`}
+                                device={tile.device}
+                                displayName={tile.displayName}
+                                inputIndex={tile.inputIndex}
+                                lockInputSelection={tile.lockInputSelection}
                                 mode="normal"
                                 groups={groups}
                                 onGroupsChanged={fetchGroups}

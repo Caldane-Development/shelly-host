@@ -371,7 +371,18 @@ shellyRouter.get("/devices/status", async (_: Request, res: Response) => {
         const statuses = await Promise.all(
             enabledDevices.map(async (device) => {
                 const result = await discoverShelly(device.ip);
-                return { id: device.id.toString(), ip: device.ip, output: Boolean(result?.["switch:0"]?.output) };
+                const inputCount = Math.max(1, Number(device.channels_count) || 1);
+                const inputStates = Array.from({ length: inputCount }, (_, inputIndex) => {
+                    const inputStatus = (result as Record<string, { state?: boolean }> | null)?.[`input:${inputIndex}`]?.state;
+                    return Boolean(inputStatus);
+                });
+
+                return {
+                    id: device.id.toString(),
+                    ip: device.ip,
+                    output: Boolean(result?.["switch:0"]?.output),
+                    inputStates,
+                };
             })
         );
         res.json(statuses);
