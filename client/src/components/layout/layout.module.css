@@ -1,0 +1,27 @@
+.topNav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #000000dd;
+}
+
+.navButton {
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  line-height: 1;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.content {
+  padding-top: 4.3rem;
+}
